@@ -1,0 +1,22 @@
+{
+    "lambda_var": {
+        "nonneg_bits_length": 15,
+        "decimal_bits_length": 4,
+        "negative_bits_length": 15
+    },
+    "submethod": "l_shape",
+    "debug_mode": true,
+    "Hybrid_mode": false,
+    "dwave": {
+        "mode": "cqm",
+        "DWave_token": "example-token",
+        "Mcut_flag": false,
+        "Cutnums": 1,
+        "num_of_read": 100
+    },
+    "threshold":{
+        "type": "absolute",
+        "gap": 0.5
+    },
+    "max_steps": 20
+}

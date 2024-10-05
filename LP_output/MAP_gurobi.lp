@@ -1,0 +1,42 @@
+\ Model Master_Problem
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Minimize
+  15 bin_x[0] + 10 bin_x[1] - 2 bin_lambda[0] - 4 bin_lambda[1]
+   - 8 bin_lambda[2] - 16 bin_lambda[3] - 32 bin_lambda[4]
+   - 64 bin_lambda[5] - 128 bin_lambda[6] - 256 bin_lambda[7]
+   - 512 bin_lambda[8] - 1024 bin_lambda[9] - 2048 bin_lambda[10]
+   - 4096 bin_lambda[11] - 8192 bin_lambda[12] - 16384 bin_lambda[13]
+   - 32768 bin_lambda[14] + 0.0625 bin_lambda[15] + 0.125 bin_lambda[16]
+   + 0.25 bin_lambda[17] + 0.5 bin_lambda[18] + bin_lambda[19]
+   + 2 bin_lambda[20] + 4 bin_lambda[21] + 8 bin_lambda[22]
+   + 16 bin_lambda[23] + 32 bin_lambda[24] + 64 bin_lambda[25]
+   + 128 bin_lambda[26] + 256 bin_lambda[27] + 512 bin_lambda[28]
+   + 1024 bin_lambda[29] + 2048 bin_lambda[30] + 4096 bin_lambda[31]
+   + 8192 bin_lambda[32] + 16384 bin_lambda[33]
+Subject To
+ MAP_init_constraints[0]: bin_x[0] + bin_x[1] >= 1
+ MAP_init_constraints[1]: bin_x[2] = 1
+ constraint_add-round-1-cut-0: 6 bin_x[0] - 2 bin_lambda[0]
+   - 4 bin_lambda[1] - 8 bin_lambda[2] - 16 bin_lambda[3]
+   - 32 bin_lambda[4] - 64 bin_lambda[5] - 128 bin_lambda[6]
+   - 256 bin_lambda[7] - 512 bin_lambda[8] - 1024 bin_lambda[9]
+   - 2048 bin_lambda[10] - 4096 bin_lambda[11] - 8192 bin_lambda[12]
+   - 16384 bin_lambda[13] - 32768 bin_lambda[14] + 0.0625 bin_lambda[15]
+   + 0.125 bin_lambda[16] + 0.25 bin_lambda[17] + 0.5 bin_lambda[18]
+   + bin_lambda[19] + 2 bin_lambda[20] + 4 bin_lambda[21]
+   + 8 bin_lambda[22] + 16 bin_lambda[23] + 32 bin_lambda[24]
+   + 64 bin_lambda[25] + 128 bin_lambda[26] + 256 bin_lambda[27]
+   + 512 bin_lambda[28] + 1024 bin_lambda[29] + 2048 bin_lambda[30]
+   + 4096 bin_lambda[31] + 8192 bin_lambda[32] + 16384 bin_lambda[33]
+   >= -11
+Bounds
+Binaries
+ bin_x[0] bin_x[1] bin_x[2] bin_lambda[0] bin_lambda[1] bin_lambda[2]
+ bin_lambda[3] bin_lambda[4] bin_lambda[5] bin_lambda[6] bin_lambda[7]
+ bin_lambda[8] bin_lambda[9] bin_lambda[10] bin_lambda[11] bin_lambda[12]
+ bin_lambda[13] bin_lambda[14] bin_lambda[15] bin_lambda[16] bin_lambda[17]
+ bin_lambda[18] bin_lambda[19] bin_lambda[20] bin_lambda[21] bin_lambda[22]
+ bin_lambda[23] bin_lambda[24] bin_lambda[25] bin_lambda[26] bin_lambda[27]
+ bin_lambda[28] bin_lambda[29] bin_lambda[30] bin_lambda[31] bin_lambda[32]
+ bin_lambda[33]
+End
