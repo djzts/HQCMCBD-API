@@ -74,7 +74,7 @@ you need to setup the config before you run the solver. Here is an example confi
 ```
 | Keyword              | Meaning | Comment |
 | :----------------     | :------: | :----: |
-| `lambda_var`  |   Connnection varibale $$t$$ in [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and $$\lambda$$ in [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)    | $$t=\lambda=\lambda^{\mathbb{Z}}_{+}+\lambda^{\mathbb{Q} \backslash \mathbb{Z}}_{+}-\lambda^{\mathbb{Z}}_{-}$$ |
+| `lambda_var`  |   Connnection varibale $$t$$ in [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and $$\lambda$$ in [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)    | $$t=\lambda=\lambda^{\mathbb{Z}}_{+}+\lambda^{\mathbb{Q}\backslash \mathbb{Z}}_{+}-\lambda^{\mathbb{Z}}_{-}$$|
 | `nonneg_bits_length`  |  The bit length assigned to the non-negative integer in the connection variable:    | **Symbol**: $$\lambda^{\mathbb{Z}}_{+}$$;<br>**Value**: Must be a positive integer number|
 | `decimal_bits_length` |   The bit length assigned to the positive decimals in the connection variable   |**Symbol**: $$\lambda^{\mathbb{Q} \backslash \mathbb{Z}}_{+}$$;<br>**Value**: Must be a positive integer number|
 | `negative_bits_length`|  The bit length assigned to the negative integer in the connection variable   | **Symbol**: $$\lambda^{\mathbb{Z}}_{-}$$;<br>**Value**: Must be a positive integer number |
