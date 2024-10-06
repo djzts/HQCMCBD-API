@@ -88,7 +88,7 @@ you need to setup the config before you run the solver. Here is an example confi
 |`Cutnums`|The number of cuts per iteration when `Mcut_flag` is true (must greater than 0)||
 |`num_of_read`|Indicates the number of states (output solutions) to read from the quantum solver. [(Ref)](https://docs.dwavesys.com/docs/latest/c_solver_parameters.html#num-reads)| Must be a positive integer in the range given by the [num_reads_range](https://docs.dwavesys.com/docs/latest/c_solver_properties.html#property-read-range) solver property|
 |`threshold`|The stopping criterion of the algorithm||
-|`type`|The type the stopping criterion|keywords:<br>`absolute`($$\epsilon\leq \mid\overline{\lambda} - \underline{\lambda}\mid$$), <br>`relative`($$\epsilon\leq \frac{\mid\overline{\lambda} - \underline{\lambda}\mid}{\mid\overline{\lambda}\mid}$$)|
+|`type`|The type the stopping criterion|keywords:<br>`absolute`($$\epsilon\leq \mid\overline{\lambda} - \underline{\lambda}\mid$$), <br>`relative`($$\epsilon\leq \frac{\mid\overline{\lambda} - \underline{\lambda}\mid}{\mid\overline{\lambda}\mid}$$),<br>**Value**: Must be a positive number.|
 |`gap`|The gap of the stopping criterion |Must be a positive number (e.g. 0.05)|
 |`max_steps`|It will let the algorithm ends the loop after `max_steps` iteration|Must be a positive integer number|
 
