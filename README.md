@@ -1,6 +1,7 @@
 # HQCMCBD (Hybrid Quantum-Classical Multi-cuts Benders' Decomposition) Algorithm
 
 <br>
+
 **HQCMCBD** (Hybrid Quantum-Classical Multi-cuts Benders' Decomposition) Algorithm is a software package for Mixed-integer Linear Programming (MILP) optimization.
 
 HQCMCBD emploies both direct and hybrid quantum optimization models named [Binary Quadratic Models (BQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/bqm.html) and [Constrained Quadratic Models (CQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/cqm.html) on D-Wave quantum computers ([D-Wave systems](https://www.dwavesys.com/)). In general, HQCMCBD is a hybrid quantum-classical version of the traditional Benders Decomposition (BD) (See [Geoffrion AM (1972)](https://link.springer.com/article/10.1007/bf00934810), [Van Slyke, R. M (1969)](https://epubs.siam.org/doi/abs/10.1137/0117061)), Unlike the classical BD, HQCMCBD demonstrates a significant advantage in solving MILP optimization problems (Such as [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)).
