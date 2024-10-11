@@ -1,0 +1,19 @@
+{
+    "info": {
+        "constraint_labels": [
+            "constraint_add-round-1-cut-1",
+            "constraint_add-round-1-cut-0"
+        ],
+        "qpu_access_time": 31989,
+        "charge_time": 5000000,
+        "run_time": 5063362,
+        "problem_id": "7db5d36a-3acf-4805-bdfc-c026d1f5d796",
+        "problem_label": "HQCBD-mul-cuts"
+    },
+    "wait_id": "7db5d36a-3acf-4805-bdfc-c026d1f5d796",
+    "time_data": {
+        "time_start": 1728628104.4427898,
+        "time_end": 1728628106.8176177,
+        "time_exec": 2374.8278617858887
+    }
+}

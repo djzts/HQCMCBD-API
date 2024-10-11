@@ -218,6 +218,7 @@ class HQCMCBD_algorithm:
                 
         self.lambda_upper = 1e30
         self.lambda_lower = -1e30
+        self.obj_value = 0
         
     def extract_parts(self, input_string):
         # Define the regex pattern with capturing groups
@@ -285,20 +286,24 @@ class HQCMCBD_algorithm:
         et = time.time()
         exe_time = (et - st) * 1000
 
-        
-
         sampleset = sampler.sample(bqm, label="Master_problem")
 
         best = sampleset.first
 
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         
-        self.lambda_lower = sampleset.first.energy
-
+        self.obj_value = sampleset.first.energy
+        local_lambda_lower = 0
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
                 self.rearranged_bin_mat[1][index] = val
+            
+            elif key.startswith("lambda_bin_"):
+                index = int(key.replace("lambda_bin_",""))
+                local_lambda_lower += val * self.lambda_coeff[index]
+        
+        self.lambda_lower = local_lambda_lower
 
         Dwave_data = {}
         Dwave_data["info"] = sampleset.info
@@ -331,12 +336,19 @@ class HQCMCBD_algorithm:
         best = sampleset.first
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         
-        self.lambda_lower = sampleset.first.energy
+        self.obj_value = sampleset.first.energy
         
+        local_lambda_lower = 0
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
                 self.rearranged_bin_mat[1][index] = val
+            
+            elif key.startswith("lambda_bin_"):
+                index = int(key.replace("lambda_bin_",""))
+                local_lambda_lower += val * self.lambda_coeff[index]
+        
+        self.lambda_lower = local_lambda_lower
 
         Dwave_data = {}
         Dwave_data["info"] = sampleset.info
@@ -372,7 +384,7 @@ class HQCMCBD_algorithm:
             
         self.final_mcut_num = min(self.mcut_num , data_length)
         
-        self.lambda_lower = np.min(sampleset.record.energy[:self.final_mcut_num])
+        self.obj_value = np.min(sampleset.record.energy[:self.final_mcut_num])
 
         best_data = sampleset.data()
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
@@ -393,15 +405,26 @@ class HQCMCBD_algorithm:
 
         create_config_file(dest_path, Dwave_data, count)
 
+        lambda_lower_list = []
         i = 0
         for datum in best_data:
+            local_lambda_lower = 0
             for key, val in datum.sample.items():
                 if key.startswith("bin_"):
                     index = int(key.replace("bin_",""))
                     self.rearranged_bin_mat[i][index] = val
+
+                elif key.startswith("lambda_bin_"):
+                    index = int(key.replace("lambda_bin_",""))
+                    local_lambda_lower += val * self.lambda_coeff[index]
+            
+            lambda_lower_list.append(local_lambda_lower)
+            
             i += 1
             if i >= self.mcut_num:
                 break
+        
+        self.lambda_lower = max(lambda_lower_list)
 
     def cqm_solve_for_value(self, count=0):
         # OBJ
@@ -414,13 +437,20 @@ class HQCMCBD_algorithm:
         best = sampleset.filter(lambda row: row.is_feasible).first
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         
-        self.lambda_lower = sampleset.filter(lambda row: row.is_feasible).first.record.energy
+        #self.lambda_lower = sampleset.filter(lambda row: row.is_feasible).first.record.energy
+        self.obj_value = sampleset.filter(lambda row: row.is_feasible).first.record.energy        
         
-
+        local_lambda_lower = 0
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
                 self.rearranged_bin_mat[1][index] = val
+            
+            elif key.startswith("lambda_bin_"):
+                index = int(key.replace("lambda_bin_",""))
+                local_lambda_lower += val * self.lambda_coeff[index]
+        
+        self.lambda_lower = local_lambda_lower
 
         Dwave_data = {}
         Dwave_data["info"] = sampleset.info
@@ -454,7 +484,11 @@ class HQCMCBD_algorithm:
             
         self.final_mcut_num = min(self.mcut_num , data_length)
         
-        self.lambda_lower = np.min(sampleset.filter(lambda row: row.is_feasible).record.energy[:self.final_mcut_num])
+        #self.lambda_lower = np.min(sampleset.filter(lambda row: row.is_feasible).record.energy[:self.final_mcut_num])
+        self.obj_value = np.min(sampleset.filter(lambda row: row.is_feasible).record.energy[:self.final_mcut_num])
+
+        #print(sum(self.bin_lambda_cqm[j] * self.lambda_coeff[j] for j in range(self.lambda_bits)))
+        #self.lambda_lower  = sum(self.bin_lambda_cqm[j] * self.lambda_coeff[j] for j in range(self.lambda_bits))
 
         best_data = sampleset.filter(lambda row: row.is_feasible).data()
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
@@ -474,16 +508,27 @@ class HQCMCBD_algorithm:
         dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_info-round-{count}.json")
 
         create_config_file(dest_path, Dwave_data, count)
-
+        
+        lambda_lower_list = []
         i = 0
         for datum in best_data:
+            local_lambda_lower = 0
             for key, val in datum.sample.items():
                 if key.startswith("bin_"):
                     index = int(key.replace("bin_",""))
                     self.rearranged_bin_mat[i][index] = val
+
+                elif key.startswith("lambda_bin_"):
+                    index = int(key.replace("lambda_bin_",""))
+                    local_lambda_lower += val * self.lambda_coeff[index]
+            
+            lambda_lower_list.append(local_lambda_lower)
+            
             i += 1
             if i >= self.mcut_num:
                 break
+        
+        self.lambda_lower = max(lambda_lower_list)
         
     def build_gurobi_master_problem(self):
         self.MAP = gp.Model("Master_Problem")
@@ -536,7 +581,8 @@ class HQCMCBD_algorithm:
             self.rearranged_bin[index] = item.X
         
         self.lambda_lower = sum(np.array([self.rearranged_bin[i] for i, item in enumerate(self.Bin_varname) if item.startswith("t_bits")]) * self.lambda_coeff)
-        
+        self.obj_value = self.MAP.ObjVal
+
     def build_gurobi_sub_problem(self, counter = 0):
         
         if self.Hybrid_mode:
@@ -737,7 +783,7 @@ class HQCMCBD_algorithm:
         self.MAP_next_rhs = np.dot(self.rhs_sub, result_ray)   #sigma * b
         
         equality = ">="
-        self.lambda_upper = self.Lshape_sub_dual.objVal
+        #self.lambda_upper = self.Lshape_sub_dual.objVal
 
     def Add_master_constraint_gurobi(self, counter = 0, index = 0):
             
@@ -807,6 +853,7 @@ class HQCMCBD_algorithm:
     def run(self):
         lambda_upper_list = []
         lambda_lower_list = []
+        obj_value_list = []
         
         ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
         abs_gap = abs(self.lambda_upper - self.lambda_lower)
@@ -833,11 +880,13 @@ class HQCMCBD_algorithm:
                 ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 
                 print(f"Round {cunt}: \n \
+                    Current Objective value is {self.obj_value}; \n \
                     lambda_upper is {self.lambda_upper}; \n \
                     lambda_lower is {self.lambda_lower}; \n \
                     Relative gap is {ratio}%. \n \
                     Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
                 
+                obj_value_list.append(self.obj_value)
                 lambda_upper_list.append(self.lambda_upper)
                 lambda_lower_list.append(self.lambda_lower)
                 
@@ -880,11 +929,13 @@ class HQCMCBD_algorithm:
                 ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 
                 print(f"Round {cunt}:\n \
+                    Current Objective value is {self.obj_value}; \n \
                     lambda_upper is {self.lambda_upper}; \n \
                     lambda_lower is {self.lambda_lower}; \n \
                     Relative gap is {ratio}%. \n \
                     Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
                 
+                obj_value_list.append(self.obj_value)
                 lambda_upper_list.append(self.lambda_upper)
                 lambda_lower_list.append(self.lambda_lower)
                 
@@ -914,6 +965,7 @@ class HQCMCBD_algorithm:
 
         lambda_upper_filepath = os.path.join(self.data_folder, "lambda_upper_list.json")
         lambda_lower_filepath = os.path.join(self.data_folder, "lambda_lower_list.json")
+        obj_value_filepath = os.path.join(self.data_folder, "obj_value_list.json")
             
         with open(lambda_upper_filepath, 'w') as json_file:
             json.dump(lambda_upper_list, json_file)
@@ -921,5 +973,9 @@ class HQCMCBD_algorithm:
         with open(lambda_lower_filepath, 'w') as json_file:
             json.dump(lambda_lower_list, json_file)
 
+        with open(obj_value_filepath, 'w') as json_file:
+            json.dump(obj_value_list, json_file)
+
         print(f"lambda_upper list has been saved to {lambda_upper_filepath}")
-        print(f"lambda_lower list has been saved to {lambda_upper_filepath}")
+        print(f"lambda_lower list has been saved to {lambda_lower_filepath}")
+        print(f"obj_value list has been saved to {obj_value_filepath}")
