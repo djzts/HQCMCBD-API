@@ -13,7 +13,6 @@ The strength of HQCMCBD lies in its ability to leverage both quantum and classic
 ###### HQCMCBD is for everyone!
 - Professionals pursuing an *off-the-shelf* MILP optimization solver to tackle problems in operations research (e.g., power systems, communication system, supply chains, manufacturing, health care, etc.),
 - Researchers who hope to advance the theory and algorithms of optimization via quantum technologies,
-- Experts in quantum computation who want to experiment with hyperparameters and/or encodings in QHD to achieve even better practical performance.
 
 ### Requirement
 `Python >= 3.8`, `Gurobi>=9.1.2`, `dwave-system>=1.10.0`
