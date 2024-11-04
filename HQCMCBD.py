@@ -62,6 +62,7 @@ class HQCMCBD_algorithm:
         self.threshold_type = threshold_config.get("type")
         self.threshold_gap = float(threshold_config.get("gap"))
         self.max_steps = int(config.get("max_steps"))
+        self.Msense = 0
         
         
         if self.Hybrid_mode:
@@ -132,7 +133,8 @@ class HQCMCBD_algorithm:
                 
         if m.ModelSense == GRB.MAXIMIZE:
             self.obj_c = -self.obj_c
-            self.obj_d = -self.obj_d         
+            self.obj_d = -self.obj_d
+            self.Msense =  1
                 
         self.x_length = len(self.Bin_varname)
         
@@ -438,13 +440,13 @@ class HQCMCBD_algorithm:
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         
         #self.lambda_lower = sampleset.filter(lambda row: row.is_feasible).first.record.energy
-        self.obj_value = sampleset.filter(lambda row: row.is_feasible).first.record.energy        
+        self.obj_value = sampleset.filter(lambda row: row.is_feasible).first.energy        
         
         local_lambda_lower = 0
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
-                self.rearranged_bin_mat[1][index] = val
+                self.rearranged_bin_mat[0][index] = val
             
             elif key.startswith("lambda_bin_"):
                 index = int(key.replace("lambda_bin_",""))
@@ -879,18 +881,28 @@ class HQCMCBD_algorithm:
                 
                 ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 
-                print(f"Round {cunt}: \n \
-                    Current Objective value is {self.obj_value}; \n \
-                    lambda_upper is {self.lambda_upper}; \n \
-                    lambda_lower is {self.lambda_lower}; \n \
-                    Relative gap is {ratio}%. \n \
-                    Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
-                
-                obj_value_list.append(self.obj_value)
-                lambda_upper_list.append(self.lambda_upper)
-                lambda_lower_list.append(self.lambda_lower)
-                
-                
+                if self.Msense:
+                    print(f"Round {cunt}: \n \
+                        Current Objective value is {-1* self.obj_value}; \n \
+                        lambda_upper is {-1*self.lambda_lower}; \n \
+                        lambda_lower is {-1*self.lambda_upper}; \n \
+                        Relative gap is {ratio}%. \n \
+                        Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
+                    obj_value_list.append(-1* self.obj_value)
+                    lambda_upper_list.append(-1*self.lambda_lower)
+                    lambda_lower_list.append(-1*self.lambda_upper)                
+                else:
+                    print(f"Round {cunt}: \n \
+                        Current Objective value is {self.obj_value}; \n \
+                        lambda_upper is {self.lambda_upper}; \n \
+                        lambda_lower is {self.lambda_lower}; \n \
+                        Relative gap is {ratio}%. \n \
+                        Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
+                    obj_value_list.append(self.obj_value)
+                    lambda_upper_list.append(self.lambda_upper)
+                    lambda_lower_list.append(self.lambda_lower)
+                    
+
                 ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 abs_gap = abs(self.lambda_upper - self.lambda_lower)
                 
@@ -928,16 +940,26 @@ class HQCMCBD_algorithm:
                 
                 ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 
-                print(f"Round {cunt}:\n \
-                    Current Objective value is {self.obj_value}; \n \
-                    lambda_upper is {self.lambda_upper}; \n \
-                    lambda_lower is {self.lambda_lower}; \n \
-                    Relative gap is {ratio}%. \n \
-                    Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
-                
-                obj_value_list.append(self.obj_value)
-                lambda_upper_list.append(self.lambda_upper)
-                lambda_lower_list.append(self.lambda_lower)
+                if self.Msense:
+                    print(f"Round {cunt}: \n \
+                        Current Objective value is {-1* self.obj_value}; \n \
+                        lambda_upper is {-1*self.lambda_lower}; \n \
+                        lambda_lower is {-1*self.lambda_upper}; \n \
+                        Relative gap is {ratio}%. \n \
+                        Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
+                    obj_value_list.append(-1* self.obj_value)
+                    lambda_upper_list.append(-1*self.lambda_lower)
+                    lambda_lower_list.append(-1*self.lambda_upper)                
+                else:
+                    print(f"Round {cunt}: \n \
+                        Current Objective value is {self.obj_value}; \n \
+                        lambda_upper is {self.lambda_upper}; \n \
+                        lambda_lower is {self.lambda_lower}; \n \
+                        Relative gap is {ratio}%. \n \
+                        Absolute gap is {abs(self.lambda_upper - self.lambda_lower)}")
+                    obj_value_list.append(self.obj_value)
+                    lambda_upper_list.append(self.lambda_upper)
+                    lambda_lower_list.append(self.lambda_lower)
                 
                 ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
                 abs_gap = abs(self.lambda_upper - self.lambda_lower)
@@ -979,3 +1001,4 @@ class HQCMCBD_algorithm:
         print(f"lambda_upper list has been saved to {lambda_upper_filepath}")
         print(f"lambda_lower list has been saved to {lambda_lower_filepath}")
         print(f"obj_value list has been saved to {obj_value_filepath}")
+        
