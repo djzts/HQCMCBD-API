@@ -6,6 +6,8 @@
 
 HQCMCBD emploies both direct and hybrid quantum optimization models named [Binary Quadratic Models (BQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/bqm.html) and [Constrained Quadratic Models (CQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/cqm.html) on D-Wave quantum computers ([D-Wave systems](https://www.dwavesys.com/)). In general, HQCMCBD is a hybrid quantum-classical version of the traditional Benders Decomposition (BD) (See [Geoffrion AM (1972)](https://link.springer.com/article/10.1007/bf00934810), [Van Slyke, R. M (1969)](https://epubs.siam.org/doi/abs/10.1137/0117061)), Unlike the classical BD, HQCMCBD demonstrates a significant advantage in solving MILP optimization problems (Such as [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)).
 
+[Tutorial on HQCMCBD](https://www.youtube.com/watch?v=VcDaOj8W4MI)
+
 ## Why HQCMCBD?
 
 The strength of HQCMCBD lies in its ability to leverage both quantum and classical computing techniques to solve large-scale, mixed-integer linear programming problems, which are notoriously difficult to manage with traditional methods. By breaking the problem into smaller, more manageable sub-problems (cuts) and iteratively refining the solution, HQCMCBD accelerates the convergence towards an optimal solution. This hybrid approach also offers the flexibility of harnessing the power of quantum computing for specific sub-tasks while relying on classical methods for others, maximizing computational efficiency.
