@@ -1,21 +1,21 @@
 {
     "info": {
         "constraint_labels": [
-            "constraint_add-round-1-cut-1",
+            "constraint_add-round-1-cut-0",
             "constraint_add-round-2-cut-0",
             "constraint_add-round-2-cut-1",
-            "constraint_add-round-1-cut-0"
+            "constraint_add-round-1-cut-1"
         ],
-        "qpu_access_time": 32012,
+        "qpu_access_time": 32037,
         "charge_time": 5000000,
-        "run_time": 5099330,
-        "problem_id": "a44abed4-47df-4d92-8672-3142e8487ce4",
+        "run_time": 5093538,
+        "problem_id": "61635b25-f6d7-41ca-8bdb-b828fc11ac42",
         "problem_label": "HQCBD-mul-cuts"
     },
-    "wait_id": "a44abed4-47df-4d92-8672-3142e8487ce4",
+    "wait_id": "61635b25-f6d7-41ca-8bdb-b828fc11ac42",
     "time_data": {
-        "time_start": 1728628115.4510276,
-        "time_end": 1728628117.5568395,
-        "time_exec": 2105.811834335327
+        "time_start": 1736214190.5894825,
+        "time_end": 1736214192.2514062,
+        "time_exec": 1661.9236469268799
     }
 }

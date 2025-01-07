@@ -1,0 +1,25 @@
+{
+    "info": {
+        "constraint_labels": [
+            "constraint_add-round-2-cut-0",
+            "constraint_add-round-1-cut-1",
+            "constraint_add-round-4-cut-0",
+            "constraint_add-round-1-cut-0",
+            "constraint_add-round-3-cut-1",
+            "constraint_add-round-2-cut-1",
+            "constraint_add-round-3-cut-0",
+            "constraint_add-round-4-cut-1"
+        ],
+        "qpu_access_time": 32048,
+        "charge_time": 5000000,
+        "run_time": 5105224,
+        "problem_id": "7407eb67-9a84-415c-ba22-076b20158395",
+        "problem_label": "HQCBD-mul-cuts"
+    },
+    "wait_id": "7407eb67-9a84-415c-ba22-076b20158395",
+    "time_data": {
+        "time_start": 1736214207.8176894,
+        "time_end": 1736214209.5851245,
+        "time_exec": 1767.435073852539
+    }
+}

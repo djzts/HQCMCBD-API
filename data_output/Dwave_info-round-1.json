@@ -1,16 +1,16 @@
 {
     "info": {
         "constraint_labels": [],
-        "qpu_access_time": 15986,
-        "charge_time": 4305774,
-        "run_time": 4305774,
-        "problem_id": "adc7cd06-896f-40a7-a040-b141f964d4d8",
+        "qpu_access_time": 15979,
+        "charge_time": 4297458,
+        "run_time": 4297458,
+        "problem_id": "36483102-f97a-4670-bc53-15b4fff9479b",
         "problem_label": "HQCBD-mul-cuts"
     },
-    "wait_id": "adc7cd06-896f-40a7-a040-b141f964d4d8",
+    "wait_id": "36483102-f97a-4670-bc53-15b4fff9479b",
     "time_data": {
-        "time_start": 1728628094.579356,
-        "time_end": 1728628096.7255807,
-        "time_exec": 2146.2247371673584
+        "time_start": 1736214174.0410988,
+        "time_end": 1736214175.9032617,
+        "time_exec": 1862.1628284454346
     }
 }

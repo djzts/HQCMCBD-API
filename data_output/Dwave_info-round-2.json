@@ -4,16 +4,16 @@
             "constraint_add-round-1-cut-1",
             "constraint_add-round-1-cut-0"
         ],
-        "qpu_access_time": 31989,
-        "charge_time": 5000000,
-        "run_time": 5063362,
-        "problem_id": "7db5d36a-3acf-4805-bdfc-c026d1f5d796",
+        "qpu_access_time": 31982,
+        "charge_time": 4953649,
+        "run_time": 4953649,
+        "problem_id": "090cf730-9ae3-4292-9c75-ad968ee7af3e",
         "problem_label": "HQCBD-mul-cuts"
     },
-    "wait_id": "7db5d36a-3acf-4805-bdfc-c026d1f5d796",
+    "wait_id": "090cf730-9ae3-4292-9c75-ad968ee7af3e",
     "time_data": {
-        "time_start": 1728628104.4427898,
-        "time_end": 1728628106.8176177,
-        "time_exec": 2374.8278617858887
+        "time_start": 1736214182.122226,
+        "time_end": 1736214183.960067,
+        "time_exec": 1837.8410339355469
     }
 }
