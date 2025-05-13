@@ -259,8 +259,14 @@ class HQCMCBD_algorithm:
                           sum(self.bin_lambda_cqm[j] * self.lambda_coeff[j] for j in range(self.lambda_bits)))
         
         for order in range(len(self.A_map)):
-            if self.map_relation == GRB.EQUAL:
+            if self.map_relation[order] == GRB.EQUAL:
                 self.cqm.add_constraint( sum(self.A_map[order, i] * self.bin_x_cqm[i] for i in range(self.num_binvars)) == self.rhs_map[order],\
+                    label=f'CQM_MAP_constraint_{order}')
+            elif self.map_relation[order] == GRB.GREATER_EQUAL:
+                self.cqm.add_constraint( sum(self.A_map[order, i] * self.bin_x_cqm[i] for i in range(self.num_binvars)) >= self.rhs_map[order],\
+                    label=f'CQM_MAP_constraint_{order}')
+            elif self.map_relation[order] == GRB.LESS_EQUAL:
+                self.cqm.add_constraint( sum(self.A_map[order, i] * self.bin_x_cqm[i] for i in range(self.num_binvars)) <= self.rhs_map[order],\
                     label=f'CQM_MAP_constraint_{order}')
        
     def solve_master_problem(self, count=0):
