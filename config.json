@@ -1,18 +1,18 @@
 {
     "lambda_var": {
-        "nonneg_bits_length": 15,
+        "nonneg_bits_length": 8,
         "decimal_bits_length": 4,
-        "negative_bits_length": 15
+        "negative_bits_length": 8
     },
     "submethod": "l_shape",
     "debug_mode": true,
-    "Hybrid_mode": false,
+    "Hybrid_mode": true,
     "dwave": {
-        "mode": "cqm",
+        "mode": "openjij",
         "DWave_token": "example-token",
         "Mcut_flag": false,
         "Cutnums": 1,
-        "num_of_read": 100
+        "num_of_read": 10000
     },
     "threshold":{
         "type": "absolute",
