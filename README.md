@@ -106,12 +106,14 @@ Zhongqi Zhao, Mingze Li, Lei Fan, Zhu Han.
 
 If you use HQCMCBD in your work, please cite our paper:
 
-@misc{zzhao2024hqcmbd,
-  author    = {Kushnir, Sam and Leng, Jiaqi and Peng, Yuxiang and Fan, Lei and Wu, Xiaodi},
-  publisher = {{INFORMS Journal on Computing}},
-  title     = {{QHDOPT}: A Software for Nonlinear Optimization with {Q}uantum {H}amiltonian {D}escent},
-  year      = {2024},
-  doi       = {10.1287/ijoc.2024.0587.cd},
-  url       = {https://github.com/INFORMSJoC/2024.0587},
-  note      = {Available for download at https://github.com/INFORMSJoC/2024.0587},
+```
+@inproceedings{zhao2025hqc,
+  title={HQC-Bend: A Python Package of Hybrid Quantum-Classical Multi-cuts Benders’ Decomposition Algorithm},
+  author={Zhao, Zhongqi and Li, Mingze and Fan, Lei and Han, Zhu},
+  booktitle={2025 International Conference on Quantum Communications, Networking, and Computing (QCNC)},
+  pages={591--597},
+  year={2025},
+  organization={IEEE},
+  url= {https://github.com/djzts/HQCMCBD-API},
+  note= {Available for download at https://github.com/djzts/HQCMCBD-API},
 }
