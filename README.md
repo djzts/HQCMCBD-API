@@ -105,7 +105,7 @@ Zhongqi Zhao, Mingze Li, Lei Fan, Zhu Han.
 ## Citation
 
 If you use HQCMCBD in your work, please cite our paper:
-<!---
+
 @misc{zzhao2024hqcmbd,
   author    = {Kushnir, Sam and Leng, Jiaqi and Peng, Yuxiang and Fan, Lei and Wu, Xiaodi},
   publisher = {{INFORMS Journal on Computing}},
@@ -115,4 +115,3 @@ If you use HQCMCBD in your work, please cite our paper:
   url       = {https://github.com/INFORMSJoC/2024.0587},
   note      = {Available for download at https://github.com/INFORMSJoC/2024.0587},
 }
->
