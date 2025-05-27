@@ -113,19 +113,6 @@ If you use HQCMCBD in your work, please cite our paper:
   year      = {2024},
   doi       = {10.1287/ijoc.2024.0587.cd},
   url       = {https://github.com/INFORMSJoC/2024.0587},
-  note      = {Available for download at https://github.com/djzts/HQCMCBD-API},
-}>
-
-```
-<!---
-@misc{zzhao2024hqcmbd,
-  author    = {Kushnir, Sam and Leng, Jiaqi and Peng, Yuxiang and Fan, Lei and Wu, Xiaodi},
-  publisher = {{INFORMS Journal on Computing}},
-  title     = {{QHDOPT}: A Software for Nonlinear Optimization with {Q}uantum {H}amiltonian {D}escent},
-  year      = {2024},
-  doi       = {10.1287/ijoc.2024.0587.cd},
-  url       = {https://github.com/INFORMSJoC/2024.0587},
   note      = {Available for download at https://github.com/INFORMSJoC/2024.0587},
 }
-```
 >
