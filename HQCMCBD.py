@@ -691,7 +691,7 @@ class HQCMCBD_algorithm:
              if self.bifurcation_QUBO[i, j] != 0.0}
 
         # create QUBO sampler in openjij
-        sampler = oj.SASampler()
+        sampler = oj.CSQASampler()
 
         st = time.time()
         response = sampler.sample_qubo(qubo_dict, num_reads=self.num_of_read)
