@@ -621,7 +621,7 @@ class HQCMCBD_algorithm:
         Q_tensor = torch.from_numpy(self.bifurcation_QUBO)
 
         st = time.time()
-        best_vector, _ = sb.minimize(Q_tensor, max_steps=1e5 , agents = 100, input_type="binary",device="cuda")
+        best_vector, _ = sb.minimize(Q_tensor, max_steps=1e5 , agents = 2048, input_type="binary",device="cuda")
         et = time.time()
         exe_time = (et - st) * 1000
         
