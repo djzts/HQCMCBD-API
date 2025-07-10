@@ -21,7 +21,7 @@ The strength of HQCMCBD lies in its ability to leverage both quantum and classic
 
 ## Usage
 
-A good example notebooks for a jump start is `Example.ipynb`. The following illustrates the basic building blocks of QHDOPT and their functionalities briefly.
+A good example notebooks for a jump start is `Example.ipynb`. The following illustrates the basic building blocks of HQCMBD and their functionalities briefly.
 
 In `.py` Import HQCMCBD by running
 
