@@ -1,56 +1,88 @@
-# HQCMCBD (Hybrid Quantum-Classical Multi-cuts Benders' Decomposition) Algorithm
+# HQCMCBD
 
-<br>
+Hybrid Quantum-Classical Multi-cuts Benders' Decomposition for mixed-integer linear programming.
 
-**HQCMCBD** (Hybrid Quantum-Classical Multi-cuts Benders' Decomposition) Algorithm is a software package for Mixed-integer Linear Programming (MILP) optimization.
+HQCMCBD is a Python implementation of the Hybrid Quantum-Classical Multi-cuts Benders' Decomposition algorithm. It solves mixed-integer linear programming (MILP) problems by decomposing them into a binary master problem and continuous subproblems. The master problem can be solved classically with Gurobi or encoded for quantum and quantum-inspired solvers such as D-Wave CQM/BQM, OpenJij, and simulated bifurcation.
 
-HQCMCBD emploies both direct and hybrid quantum optimization models named [Binary Quadratic Models (BQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/bqm.html) and [Constrained Quadratic Models (CQM)](https://docs.ocean.dwavesys.com/en/stable/concepts/cqm.html) on D-Wave quantum computers ([D-Wave systems](https://www.dwavesys.com/)). In general, HQCMCBD is a hybrid quantum-classical version of the traditional Benders Decomposition (BD) (See [Geoffrion AM (1972)](https://link.springer.com/article/10.1007/bf00934810), [Van Slyke, R. M (1969)](https://epubs.siam.org/doi/abs/10.1137/0117061)), Unlike the classical BD, HQCMCBD demonstrates a significant advantage in solving MILP optimization problems (Such as [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)).
+Tutorial: [HQCMCBD overview video](https://www.youtube.com/watch?v=VcDaOj8W4MI)
 
-[Tutorial on HQCMCBD](https://www.youtube.com/watch?v=VcDaOj8W4MI)
+## Features
 
-## Why HQCMCBD?
+- Classical Benders decomposition workflow with Gurobi.
+- Hybrid quantum-classical master problem solving through D-Wave CQM/BQM samplers.
+- Local quantum-inspired solving through OpenJij and simulated bifurcation.
+- Single-cut and multi-cut modes.
+- Configurable stopping criteria, lambda encoding precision, solver backend, and debug output.
+- Notebook examples for quick experimentation.
 
-The strength of HQCMCBD lies in its ability to leverage both quantum and classical computing techniques to solve large-scale, mixed-integer linear programming problems, which are notoriously difficult to manage with traditional methods. By breaking the problem into smaller, more manageable sub-problems (cuts) and iteratively refining the solution, HQCMCBD accelerates the convergence towards an optimal solution. This hybrid approach also offers the flexibility of harnessing the power of quantum computing for specific sub-tasks while relying on classical methods for others, maximizing computational efficiency.
+## Requirements
 
-###### HQCMCBD is for everyone!
-- Professionals pursuing an *off-the-shelf* MILP optimization solver to tackle problems in operations research (e.g., power systems, communication system, supply chains, manufacturing, health care, etc.),
-- Researchers who hope to advance the theory and algorithms of optimization via quantum technologies,
+- Python 3.8 or later
+- Gurobi 9.1.2 or later with a valid license
+- `gurobipy`
+- `numpy`
+- `dimod`
+- `dwave-system`
+- Optional: `openjij` for OpenJij mode
+- Optional: `torch` and `simulated-bifurcation` for simulated bifurcation mode
 
-### Requirement
-`Python >= 3.8`, `Gurobi>=9.1.2`, `dwave-system>=1.10.0`
+The repository currently does not include a `requirements.txt`, so install the solver packages required by the modes you plan to use.
 
-## Usage
+## Project Layout
 
-A good example notebooks for a jump start is `Example.ipynb`. The following illustrates the basic building blocks of HQCMBD and their functionalities briefly.
+| Path | Purpose |
+| --- | --- |
+| `HQCMCBD.py` | Main implementation. |
+| `HQCMCBD_notebook.ipynb` | Notebook loader that delegates to `HQCMCBD.py`. |
+| `Example.ipynb` | Basic example notebook. |
+| `Example-3bin-run.ipynb` | Three-binary-variable example. |
+| `Example-3bin-output.ipynb` | Example notebook with output. |
+| `config.json` | User-editable configuration for `mode="manual"`. |
+| `config_default.json` | Default configuration for `mode="default"`. |
+| `data_output/` | Runtime solution and metadata output. |
+| `LP_output/` | Debug LP exports from Gurobi models. |
+| `LP_output_dwave/` | Quantum and quantum-inspired solver output files. |
 
-In `.py` Import HQCMCBD by running
+## Quick Start
+
+Import the solver in a Python script:
 
 ```python
 from HQCMCBD import HQCMCBD_algorithm
-from HQCMCBD import *
 ```
 
-In `.ipynb` Import HQCMCBD by running
+Or load it in a notebook:
 
 ```python
 %run HQCMCBD_notebook.ipynb
 ```
 
-You can create a problem instance by directly constructing the function via `Gurobi` first. Then, you can use our solver to get the solutions.
+Create a Gurobi model, then pass it to HQCMCBD:
 
 ```python
-# Optimize the model
-model = gp.Model("Example_model")
-...
+import gurobipy as gp
+from gurobipy import GRB
+from HQCMCBD import HQCMCBD_algorithm
+
+model = gp.Model("example_model")
+
+# Build your MILP model here.
+# Add binary variables, continuous non-negative variables, constraints,
+# and the objective function.
+
 model.optimize()
-Solver = HQCMCBD_algorithm(model, mode = "manual")
-Solver.run()
+
+solver = HQCMCBD_algorithm(model, mode="manual")
+solver.run()
 ```
 
-### Configuration and parameters
-you need to setup the config before you run the solver. Here is an example configuration `json`
+Use `mode="manual"` to load `config.json`, or `mode="default"` to load `config_default.json`.
 
-```JSON
+## Configuration
+
+Before running the solver, review the selected configuration file.
+
+```json
 {
     "lambda_var": {
         "nonneg_bits_length": 15,
@@ -58,62 +90,88 @@ you need to setup the config before you run the solver. Here is an example confi
         "negative_bits_length": 15
     },
     "submethod": "l_shape",
-    "debug_mode": true,
+    "debug_mode": false,
     "Hybrid_mode": false,
     "dwave": {
         "mode": "cqm",
-        "DWave_token": "example-token",
+        "DWave_token": "YOUR_DWAVE_TOKEN",
         "Mcut_flag": false,
         "Cutnums": 1,
         "num_of_read": 100
     },
-    "threshold":{
+    "threshold": {
         "type": "absolute",
         "gap": 0.5
     },
     "max_steps": 20
 }
 ```
-| Keyword              | Meaning | Comment |
-| :----------------     | :------: | :----: |
-| `lambda_var`  |   Connnection varibale $$t$$ in [[1]](https://ieeexplore.ieee.org/abstract/document/9771632) and $$\lambda$$ in [[2]](https://ieeexplore.ieee.org/abstract/document/10232912)    | $$t=\lambda=\lambda_{+}^{\mathbb{Z}}+\lambda_{+}^{\mathbb{Q}\backslash\mathbb{Z}}-\lambda_{-}^{\mathbb{Z}}$$|
-| `nonneg_bits_length`  |  The bit length assigned to the non-negative integer in the connection variable:    | **Symbol**: $$\lambda^{\mathbb{Z}}_{+}$$;<br>**Value**: Must be a positive integer number|
-| `decimal_bits_length` |   The bit length assigned to the positive decimals in the connection variable   |**Symbol**: $$\lambda^{\mathbb{Q} \backslash \mathbb{Z}}_{+}$$;<br>**Value**: Must be a positive integer number|
-| `negative_bits_length`|  The bit length assigned to the negative integer in the connection variable   | **Symbol**: $$\lambda^{\mathbb{Z}}_{-}$$;<br>**Value**: Must be a positive integer number |
-| `submethod` |  Methods for solving subproblems    | keywords:<br>[`normal`](https://ieeexplore.ieee.org/abstract/document/10232912),<br>[`l_shape`](https://epubs.siam.org/doi/abs/10.1137/0117061)  |
-|`debug_mode`|A flag to control whether LP files of both MAP and SUB will be printed or not| keywords:<br>`true`(print), <br>`false`(blank)|
-|`Hybrid_mode`|A flag that controls whether to use a quantum computer to solve the MAP|keywords:<br>`true`(Q+C),<br>`false`(C+C)|
-|`dwave`| parameters for D-Wave quantum machine or local Simulated Annealing (SA) Solver||
-|`mode`| The way to encode the MAP into the quantum solver| keywords:<br> *[`cqm`](https://docs.ocean.dwavesys.com/projects/system/en/stable/reference/samplers.html#dwave.system.samplers.LeapHybridCQMSampler)(LeapHybridCQMSampler),<br>[`bqm_hybrid`](https://docs.ocean.dwavesys.com/projects/system/en/stable/reference/samplers.html#dwave.system.samplers.LeapHybridSampler)(LeapHybridSampler),<br> [`bqm_quantum`](https://docs.ocean.dwavesys.com/projects/system/en/stable/reference/generated/dwave.system.samplers.DWaveSampler.sample.html#dwave-system-samplers-dwavesampler-sample)(DWaveSampler),<br> [`bifurcation`](https://github.com/bqth29/simulated-bifurcation-algorithm)(Local GPU Q simulator),<br> *[`openjij`](https://github.com/bqth29/simulated-bifurcation-algorithm)(Local CPU/GPU Q simulator),<br> for the detailed installation guidance of openjij and bifurcation, please refer this page.<br>*preferred method|
-|`DWave_token`|The special token for running the D-Wave| start with "DEV-xxxxxxxxxxxx"|
-|`Mcut_flag`|A flag to control whether the muti-cuts strategy will be applied in the algorithm| keywords:<br>`true`(Yes), <br>`false`(No, only 1 cut per iteration)|
-|`Cutnums`|The number of cuts per iteration when `Mcut_flag` is true (must greater than 0)||
-|`num_of_read`|Indicates the number of states (output solutions) to read from the [quantum solver](https://docs.dwavesys.com/docs/latest/c_solver_parameters.html#num-reads) and [openjij simulator](https://tutorial.openjij.org/en/tutorial/001-openjij_introduction.html).| Must be a positive integer in the range given by the [num_reads_range](https://docs.dwavesys.com/docs/latest/c_solver_properties.html#property-read-range) solver property|
-|`threshold`|The stopping criterion of the algorithm||
-|`type`|The type the stopping criterion|keywords:<br>`absolute`($$\epsilon\leq \mid\overline{\lambda} - \underline{\lambda}\mid$$), <br>`relative`($$\epsilon\leq \frac{\mid\overline{\lambda} - \underline{\lambda}\mid}{\mid\overline{\lambda}\mid}$$),<br>**Value**: Must be a positive number.|
-|`gap`|The gap of the stopping criterion |Must be a positive number (e.g. 0.05)|
-|`max_steps`|It will let the algorithm ends the loop after `max_steps` iteration|Must be a positive integer number|
+
+| Key | Description | Valid values |
+| --- | --- | --- |
+| `lambda_var.nonneg_bits_length` | Bit length for the non-negative integer component of the connection variable. | Positive integer |
+| `lambda_var.decimal_bits_length` | Bit length for the positive fractional component of the connection variable. | Positive integer |
+| `lambda_var.negative_bits_length` | Bit length for the negative integer component of the connection variable. | Positive integer |
+| `submethod` | Subproblem strategy. | `normal`, `l_shape` |
+| `debug_mode` | Whether to export LP model files. | `true`, `false` |
+| `Hybrid_mode` | Whether to solve the master problem with a quantum or quantum-inspired backend. | `true`, `false` |
+| `dwave.mode` | Master-problem backend when `Hybrid_mode` is enabled. | `cqm`, `bqm_hybrid`, `bqm_quantum`, `bifurcation`, `openjij` |
+| `dwave.DWave_token` | D-Wave API token. | Token string or `YOUR_DWAVE_TOKEN` |
+| `dwave.Mcut_flag` | Whether to add multiple cuts per iteration. | `true`, `false` |
+| `dwave.Cutnums` | Number of cuts when multi-cut mode is enabled. | Positive integer |
+| `dwave.num_of_read` | Number of samples for BQM/OpenJij modes. | Positive integer |
+| `threshold.type` | Stopping criterion type. | `absolute`, `relative` |
+| `threshold.gap` | Stopping gap. | Positive number |
+| `max_steps` | Maximum Benders iterations. | Positive integer |
+
+For D-Wave runs, do not commit real tokens. Either put the token in a local, untracked config file or set:
+
+```powershell
+$env:DWAVE_API_TOKEN = "YOUR_TOKEN"
+```
+
+## Outputs
+
+Runtime files are written to:
+
+- `data_output/` for objective values, lambda bounds, solver metadata, and MAP solutions.
+- `LP_output/` for Gurobi LP exports when `debug_mode` is enabled.
+- `LP_output_dwave/` for quantum and quantum-inspired solver artifacts.
+
+These files are useful for debugging and reproducing experiments, but they may be regenerated by future runs.
+
+## Notes
+
+- Continuous variables should be non-negative. The preprocessing step warns when a variable has a negative lower bound.
+- Maximization models are converted internally to minimization and reported back with the original sign convention.
+- `HQCMCBD_notebook.ipynb` intentionally loads `HQCMCBD.py` instead of duplicating the implementation.
 
 ## Contact
-Zhongqi Zhao [zzhao27@uh.edu](mailto:zzhao27@uh.edu)
 
-Mingze Li [mli44@central.uh.edu](mailto:mli44@central.uh.edu)
+- Zhongqi Zhao: [zzhao27@uh.edu](mailto:zzhao27@uh.edu)
+- Mingze Li: [mli44@central.uh.edu](mailto:mli44@central.uh.edu)
 
 ## Contributors
+
 Zhongqi Zhao, Mingze Li, Lei Fan, Zhu Han.
 
 ## Citation
 
-If you use HQCMCBD in your work, please cite our paper:
+If you use HQCMCBD in your work, please cite:
 
-```
+```bibtex
 @inproceedings{zhao2025hqc,
-  title={HQC-Bend: A Python Package of Hybrid Quantum-Classical Multi-cuts Benders’ Decomposition Algorithm},
+  title={HQC-Bend: A Python Package of Hybrid Quantum-Classical Multi-cuts Benders' Decomposition Algorithm},
   author={Zhao, Zhongqi and Li, Mingze and Fan, Lei and Han, Zhu},
   booktitle={2025 International Conference on Quantum Communications, Networking, and Computing (QCNC)},
   pages={591--597},
   year={2025},
   organization={IEEE},
-  url= {https://github.com/djzts/HQCMCBD-API},
-  note= {Available for download at https://github.com/djzts/HQCMCBD-API},
+  url={https://github.com/djzts/HQCMCBD-API},
+  note={Available for download at https://github.com/djzts/HQCMCBD-API}
 }
+```
+
+## License
+
+This project is released under the license included in [LICENSE](LICENSE).

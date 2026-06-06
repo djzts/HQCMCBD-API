@@ -9,7 +9,7 @@
     "Hybrid_mode": true,
     "dwave": {
         "mode": "cqm",
-        "DWave_token": "DEV-2d2003db97888c1e5544be181cd6ac6f95b9a293",
+        "DWave_token": "YOUR_DWAVE_TOKEN",
         "Mcut_flag": true,
         "Cutnums": 2,
         "num_of_read": 100

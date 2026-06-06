@@ -1,16 +1,10 @@
-# Gurobi
 import gurobipy as gp
-from gurobipy import GRB, Model, quicksum
+from gurobipy import GRB, quicksum
 import numpy as np
 import re
 import os
 import dimod
-from dimod.binary.binary_quadratic_model import BinaryQuadraticModel, Binary, Spin, as_bqm
-from dimod.discrete.discrete_quadratic_model import DiscreteQuadraticModel
-from dimod import ConstrainedQuadraticModel, Binary
 from dimod import cqm_to_bqm
-#import dwave.inspector
-#import dwave.system
 from dwave.system import LeapHybridCQMSampler
 from dwave.system import LeapHybridSampler
 from dwave.system import DWaveSampler
@@ -18,11 +12,18 @@ from dwave.system import EmbeddingComposite
 import time
 import json
 
-# Bifurcation
 import torch
 import simulated_bifurcation as sb
-#openjij
 import openjij as oj
+
+
+DEFAULT_CONFIG_FILE = "config_default.json"
+MANUAL_CONFIG_FILE = "config.json"
+DATA_OUTPUT_DIR = "data_output"
+LP_OUTPUT_DIR = "LP_output"
+QUANTUM_OUTPUT_DIR = "LP_output_dwave"
+DEFAULT_QUBO_PENALTY = 1e3
+DEFAULT_CUT_PENALTY = 10
 
 
 def load_config(config_file):
@@ -30,11 +31,20 @@ def load_config(config_file):
         config = json.load(file)
     return config
 
-# Function to write config data to a JSON file
+
 def create_config_file(config_file, config_data, round):
+    """Write JSON runtime metadata for one decomposition round."""
     with open(config_file, 'w') as file:
         json.dump(config_data, file, indent=4)
     print(f"The {round}-th Config file of quantum sampling is created successfully at {config_file}.")
+
+
+def _resolve_dwave_token(config_token):
+    """Prefer an explicit token, but allow standard environment configuration."""
+    token = str(config_token or "").strip()
+    if not token or token in {"example-token", "YOUR_DWAVE_TOKEN"}:
+        return os.getenv("DWAVE_API_TOKEN")
+    return token
     
 """
 Part of QUBO Construction
@@ -59,8 +69,8 @@ def add_end(a,b):
     return c
 
 def QUBO_Cons_ineq_normal(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None, dictionary = None):
-    if penalty == None:
-        penalty = 1e3
+    if penalty is None:
+        penalty = DEFAULT_QUBO_PENALTY
     disturbance = 1e-6
     QUBO = QUBO_pre.copy()
     # M
@@ -71,64 +81,48 @@ def QUBO_Cons_ineq_normal(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty 
         # Coeff = C for C * s
         Slack_Var_Add_coeff = 2 ** np.arange(Slack_Var_Add_num)
         for slack_index in range(int(Slack_Var_Add_num)):
-            if not dictionary == None:
+            if dictionary is not None:
                 next_index = len(dictionary)
                 dictionary["s_%d_%d"%(round_num, slack_index)] = next_index
             QUBO = np.pad(QUBO, [(0, 1), (0, 1)], mode='constant', constant_values = 0)   #local QUBO arithmaic
         var_matched = np.zeros(len(QUBO))
-        #The Final answer of is  (∑Ax + ∑Cs - M)^2
-        #  (∑Ax)*(∑Ax) + (∑Cs)*(∑Cs) + (∑Ax)(∑Cs) + (∑Cs)(∑Ax) 
-        # - 2(∑MCs) - 2(∑MAx)
-        #(Ax)
+        # Penalize violations of (A*x + C*s - M)^2.
         var_matched_1 = add_front(lhs, var_matched)
-        #(Cs)
         if Slack_Var_Add_num > 0:
             var_matched_2 = add_end(Slack_Var_Add_coeff, var_matched)        
-        #(∑Ax)*(∑Ax)
         QUBO += penalty * (np.outer(var_matched_1, var_matched_1))
         if Slack_Var_Add_num > 0:       
-            #(∑Cs)*(∑Cs)   
             QUBO += penalty * (np.outer(var_matched_2, var_matched_2))
-            #(∑Ax)(∑Cs) + (∑Cs)(∑Ax) 
             QUBO += penalty * (np.outer(var_matched_1, var_matched_2) + np.outer(var_matched_2, var_matched_1))
-            # -2(∑MCs) 
             QUBO -= penalty * 2 * M *(np.diag(var_matched_2))
-        #- 2(∑MAx)
         QUBO -= penalty * 2 * M *(np.diag(var_matched_1))                  
     else: # symbol == ">=":
         max_value = np.sum(lhs[lhs>0])
         Slack_Var_Add_num = max(0,np.ceil(np.log2(max_value - rhs + disturbance)))
         Slack_Var_Add_coeff = 2 ** np.arange(Slack_Var_Add_num)
         for slack_index in range(int(Slack_Var_Add_num)):
-            if not dictionary == None:
+            if dictionary is not None:
                 next_index = len(dictionary)
                 dictionary["s_%d_%d"%(round_num, slack_index)] = next_index
             QUBO = np.pad(QUBO, [(0, 1), (0, 1)], mode='constant', constant_values = 0)   #local QUBO arithmaic      
         var_matched = np.zeros(len(QUBO))
-        #The Final answer of is  (∑Ax - ∑Cs - M)^2 == (∑Ax)*(∑Ax) + (∑Cs)*(∑Cs) - (∑Ax)(∑Cs) - (∑Cs)(∑Ax) + 2(∑MCs) - 2(∑MAx)
-        # (Ax)
+        # Penalize violations of (A*x - C*s - M)^2.
         var_matched_1 = add_front(lhs, var_matched) 
-        # (Cs)
         if Slack_Var_Add_num > 0:
             var_matched_2 = add_end(Slack_Var_Add_coeff, var_matched)        
-        # (∑Ax)*(∑Ax)
         QUBO += penalty * (np.outer(var_matched_1, var_matched_1))
         if Slack_Var_Add_num > 0:    
-            # (∑Cs)*(∑Cs)   
             QUBO += penalty * (np.outer(var_matched_2, var_matched_2))
-            # -(∑Ax)(∑Cs) - (∑Cs)(∑Ax) 
             QUBO -= penalty * (np.outer(var_matched_1, var_matched_2) + np.outer(var_matched_2, var_matched_1))
-            # +2(∑MCs) 
             QUBO += penalty * 2 * M *(np.diag(var_matched_2))
-        # -2(∑MAx)
         QUBO -= penalty * 2 * M *(np.diag(var_matched_1))        
     #if no dictionary is needed. just do QUBO, _ = function(*args) 
     return QUBO, dictionary
 
 def QUBO_Cons_ineq_0(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None, dictionary = None):
     #set up a default penalty just in case ... 
-    if penalty == None:
-        penalty = 1e3
+    if penalty is None:
+        penalty = DEFAULT_QUBO_PENALTY
     QUBO = QUBO_pre.copy()
     modification_region = len(lhs) 
     # Contraint QUBOlize : 
@@ -147,13 +141,11 @@ def QUBO_Cons_ineq_0(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = Non
 
 def QUBO_Cons_leq_1(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None, dictionary = None):
     """
-    Cons = Sum(xy)
-           ───┬───
-         np.triu(np.outer(lhs, lhs), k = 1)
+    Add pairwise penalties for binary constraints of the form sum(x) <= 1.
     """
     #set up a default penalty just in case ... 
-    if penalty == None:
-        penalty = 1e3
+    if penalty is None:
+        penalty = DEFAULT_QUBO_PENALTY
     QUBO = QUBO_pre.copy()
     modification_region = len(lhs) 
     QUBO[:modification_region, :modification_region] += penalty * (np.triu(np.outer(lhs, lhs), k = 1))     
@@ -161,14 +153,10 @@ def QUBO_Cons_leq_1(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None
     return QUBO, dictionary
 
 def QUBO_Cons_geq_1(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None, dictionary = None):
-    # Cons = 1 (- x - y) +  xy
-    #           ───┬───    ──┬─
-    #           diag(arg)    │
-    #                        │ 
-    #          np.triu( np.outer(lhs, lhs), k = 1)
+    # Add penalties for binary constraints of the form sum(x) >= 1.
     #set up a default penalty just in case ... 
-    if penalty == None:
-        penalty = 1e3
+    if penalty is None:
+        penalty = DEFAULT_QUBO_PENALTY
     QUBO = QUBO_pre.copy()
     modification_region = len(lhs)
     QUBO[:modification_region, :modification_region] += penalty * ( np.triu( np.outer(lhs, lhs), k = 1) - np.diag(lhs) )     
@@ -177,39 +165,20 @@ def QUBO_Cons_geq_1(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None
 
 def QUBO_Cons_eq(QUBO_pre, lhs, rhs, round_num = None, penalty = None, dictionary = None):
     # Let assume  Ax = b =====> lhs * x = rhs
-    #
-    # Cons =    x'A'Ax   -   2Abx + (b^2) constant neglect 
-    #           ───┬───      ──┬─
-    #      np.outer(lhs,lhs)   │
-    #                          │ 
-    #                 2 * rhs * np.diag(lhs)
+    # Use x'A'Ax - 2Abx; the constant b^2 is omitted because it does not
+    # change the minimizer.
     #set up a default penalty just in case ... 
-    if penalty == None:
-        penalty = 1e3
+    if penalty is None:
+        penalty = DEFAULT_QUBO_PENALTY
     QUBO = QUBO_pre.copy()
     modification_region = len(lhs)
     QUBO[:modification_region, :modification_region] += penalty * ( np.outer(lhs,lhs) - 2 * rhs * np.diag(lhs) )     
     # if no dictionary is needed. just do QUBO, _ = function(*args) 
     return QUBO, dictionary
 
-# QUBO_Cons_selection blue print
-# if symbol == "="
-# function(QUBO_Cons_eq)
-#
-# if not (normalize?)     
-#  rhs  other   1   0
-#        ─┬    ─┬  ─┬  
-#         │     │   │  
-#         │     │   └┤ lhs Bin && np.sum(lhs) == 0 && np.sum(abs(lhs))== 2 ? ─┬┤yes: function(QUBO_Cons_ineq_0)
-#         │     │                                                             │ 
-#         │     │                                                             └┤No: function(QUBO_Cons_ineq_normal)
-#         │     │
-#         │     └────┤ lhs Bin && symbol == "<=" ? &&─┬────┤yes: function(QUBO_Cons_leq_1)
-#         │                                           │                                               
-#         │                                           └────┤No (symbol == ">=") if lhs Bin && np.sum(lhs)== 2   ─┬┤yes: function(QUBO_Cons_geq_1)
-#         │                                                                                                      │ 
-#         │                                                                                                      └┤No: function(QUBO_Cons_ineq_normal)
-#         └──────────┤ function(QUBO_Cons_ineq_normal)
+# Choose the smallest correct QUBO encoding for common constraint patterns.
+# Specialized encodings keep the QUBO smaller; the normal inequality encoder is
+# used as the safe fallback for general linear constraints.
 
 def QUBO_Cons_selection(QUBO_pre, lhs, symbol, rhs, round_num = None, penalty = None, dictionary = None):
     if symbol == "=":
@@ -240,18 +209,18 @@ class HQCMCBD_algorithm:
         # Initialize positional arguments
         mode = kwargs.get('mode')    
         if mode == "manual":
-            config_file = 'config.json'
+            config_file = MANUAL_CONFIG_FILE
         elif mode == "default":
-            config_file = 'config_default.json'  
+            config_file = DEFAULT_CONFIG_FILE
         else:
-            print("Invalid Input")
+            raise ValueError("mode must be either 'manual' or 'default'")
         config = load_config(config_file)
-        lambda_config = config.get("lambda_var")
+        lambda_config = config.get("lambda_var", {})
         submethod = config.get("submethod")
         debug_mode = config.get("debug_mode")
         Hybrid_mode = config.get("Hybrid_mode")
-        dwave_config = config.get("dwave")
-        threshold_config = config.get("threshold")
+        dwave_config = config.get("dwave", {})
+        threshold_config = config.get("threshold", {})
         self.lambda_nneg_bit = lambda_config.get("nonneg_bits_length")
         self.lambda_dec_bit = lambda_config.get("decimal_bits_length")
         self.lambda_neg_bit = lambda_config.get("negative_bits_length")
@@ -262,25 +231,49 @@ class HQCMCBD_algorithm:
         self.threshold_gap = float(threshold_config.get("gap"))
         self.max_steps = int(config.get("max_steps"))
         self.Msense = 0
+
+        if self.sub_method not in {"normal", "l_shape"}:
+            raise ValueError("submethod must be either 'normal' or 'l_shape'")
+        if self.threshold_type not in {"absolute", "relative"}:
+            raise ValueError("threshold.type must be either 'absolute' or 'relative'")
+        if self.threshold_gap <= 0:
+            raise ValueError("threshold.gap must be positive")
+        if self.max_steps <= 0:
+            raise ValueError("max_steps must be a positive integer")
+        for key, value in {
+            "nonneg_bits_length": self.lambda_nneg_bit,
+            "decimal_bits_length": self.lambda_dec_bit,
+            "negative_bits_length": self.lambda_neg_bit,
+        }.items():
+            if not isinstance(value, int) or value <= 0:
+                raise ValueError(f"lambda_var.{key} must be a positive integer")
         
         if self.Hybrid_mode:
             self.dwave_solver = dwave_config.get("mode")
-            self.dwave_token = str(dwave_config.get("DWave_token"))
+            if self.dwave_solver not in {"cqm", "bqm_hybrid", "bqm_quantum", "bifurcation", "openjij"}:
+                raise ValueError("dwave.mode is invalid")
+            self.dwave_token = _resolve_dwave_token(dwave_config.get("DWave_token"))
             self.MC_flag = dwave_config.get("Mcut_flag")
             self.num_of_read = dwave_config.get("num_of_read")
+            if not isinstance(self.num_of_read, int) or self.num_of_read <= 0:
+                raise ValueError("dwave.num_of_read must be a positive integer")
             if self.MC_flag:
                 self.mcut_num = int(dwave_config.get("Cutnums"))
             else:
                 self.mcut_num = 1
+            if self.mcut_num <= 0:
+                raise ValueError("dwave.Cutnums must be a positive integer")
         else:
             self.mcut_num = 1
 
         current_folder = os.getcwd()
-        self.data_folder = os.path.join(current_folder, "data_output")
+        self.data_folder = os.path.join(current_folder, DATA_OUTPUT_DIR)
         os.makedirs(self.data_folder, exist_ok=True)
         print(f"Folder '{self.data_folder}' has been created or already exists for storing the json data")
-        self.LP_folder = os.path.join(current_folder, "LP_output")
+        self.LP_folder = os.path.join(current_folder, LP_OUTPUT_DIR)
         os.makedirs(self.LP_folder, exist_ok=True)
+        self.quantum_LP_folder = os.path.join(current_folder, QUANTUM_OUTPUT_DIR)
+        os.makedirs(self.quantum_LP_folder, exist_ok=True)
         self.preprocessing(m)
 
     def preprocessing(self, m):
@@ -409,7 +402,12 @@ class HQCMCBD_algorithm:
         bin_name_list = []
         self.bin_var_count = {}
         for item in self.Bin_varname:
-            name, index = self.extract_parts(item)
+            parsed = self.extract_parts(item)
+            if parsed is None:
+                # Scalar Gurobi variables are named without "[index]".
+                name, index = item, 0
+            else:
+                name, index = parsed
             if name in bin_name_list:
                 old_index = self.bin_var_count[name]
                 self.bin_var_count[name] = max(old_index, index + 1)
@@ -456,7 +454,7 @@ class HQCMCBD_algorithm:
         for const_ in range(num_map_constrs):
             lhs = np.concatenate((self.A_map[const_] , np.zeros_like(self.lambda_coeff)))
             self.bifurcation_QUBO, self.qubo_slack_dict  = QUBO_Cons_selection(self.bifurcation_QUBO, lhs, self.map_relation[const_],\
-                                                                                self.rhs_map[const_], round_num= 0, penalty=10, \
+                                                                                self.rhs_map[const_], round_num= 0, penalty=DEFAULT_CUT_PENALTY, \
                                                                                     dictionary = self.qubo_slack_dict)
 
     def solve_master_problem(self, count=0):
@@ -501,7 +499,7 @@ class HQCMCBD_algorithm:
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
-                self.rearranged_bin_mat[1][index] = val  
+                self.rearranged_bin_mat[0][index] = val
             elif key.startswith("lambda_bin_"):
                 index = int(key.replace("lambda_bin_",""))
                 local_lambda_lower += val * self.lambda_coeff[index]
@@ -516,7 +514,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Dwave_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_hbqm_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Dwave_hbqm_info-round-{count}.json")
         create_config_file(dest_path, Dwave_data, count)
 
     def qbqm_solve_for_value(self, count=0):
@@ -537,7 +535,7 @@ class HQCMCBD_algorithm:
         for key, val in best.sample.items():
             if key.startswith("bin_"):
                 index = int(key.replace("bin_",""))
-                self.rearranged_bin_mat[1][index] = val
+                self.rearranged_bin_mat[0][index] = val
             
             elif key.startswith("lambda_bin_"):
                 index = int(key.replace("lambda_bin_",""))
@@ -553,7 +551,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Dwave_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_qbqm_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Dwave_qbqm_info-round-{count}.json")
         create_config_file(dest_path, Dwave_data, count)
     
     def qbqm_solve_for_value_mul_cuts(self, count=0):
@@ -582,7 +580,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Dwave_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_qbqm_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Dwave_qbqm_info-round-{count}.json")
         create_config_file(dest_path, Dwave_data, count)
 
         lambda_lower_list = []
@@ -604,7 +602,8 @@ class HQCMCBD_algorithm:
         self.lambda_lower = max(lambda_lower_list)
     
     def bifurcation_solve_for_value(self, count=0, penalty = 1):
-        with open(f'LP_output_dwave\LP_output_MAP_{count}.lp', 'w') as f:
+        lp_path = os.path.join(self.quantum_LP_folder, f"LP_output_MAP_{count}.lp")
+        with open(lp_path, 'w') as f:
             dimod.lp.dump(self.cqm, f)
         bqm, inverter = cqm_to_bqm(self.cqm, penalty)
         bin_var_dictionary = inverter.to_dict()['binary']
@@ -617,7 +616,7 @@ class HQCMCBD_algorithm:
         self.bifurcation_QUBO = np.zeros((size, size))
         np.fill_diagonal(self.bifurcation_QUBO, lin)
         self.bifurcation_QUBO[row, col] = quad
-        #np.save(f"LP_output_dwave\bifurcation_round_{count}.npy", self.bifurcation_QUBO) # maybe for future use
+        # Save the solver input here if detailed QUBO inspection is needed.
         Q_tensor = torch.from_numpy(self.bifurcation_QUBO)
 
         st = time.time()
@@ -627,7 +626,7 @@ class HQCMCBD_algorithm:
         
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         best_bin_vector = best_vector.cpu().numpy()
-        np.save(f"LP_output_dwave\LP_output_BF_MAP_{count}.npy", best_bin_vector)
+        np.save(os.path.join(self.quantum_LP_folder, f"LP_output_BF_MAP_{count}.npy"), best_bin_vector)
         x_keys = [key for key in bin_var_dictionary if key.startswith('bin_')]
         lambda_keys = [f"lambda_bin_{i}" for i in range(self.lambda_bits)]
         # Fill x matrix
@@ -648,11 +647,11 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Bifurcation_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Bifurcation_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Bifurcation_info-round-{count}.json")
         create_config_file(dest_path, Bifurcation_data, count)
             
-    def bifurcation_solve_for_value_classic(self, count=0, penalty = 10):
-        #np.save(f"LP_output_dwave\bifurcation_round_{count}.npy", self.bifurcation_QUBO) # maybe for future use
+    def bifurcation_solve_for_value_classic(self, count=0, penalty = DEFAULT_CUT_PENALTY):
+        # Save the solver input here if detailed QUBO inspection is needed.
         Q_tensor = torch.from_numpy(self.bifurcation_QUBO)
 
         st = time.time()
@@ -662,7 +661,7 @@ class HQCMCBD_algorithm:
 
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
         best_bin_vector = best_vector.cpu().numpy()
-        np.save(f"LP_output_dwave\LP_output_BF_MAP_{count}.npy", best_bin_vector)
+        np.save(os.path.join(self.quantum_LP_folder, f"LP_output_BF_MAP_{count}.npy"), best_bin_vector)
         
         # Fill x matrix
         self.rearranged_bin_mat[0] = best_bin_vector[:self.num_binvars]
@@ -680,11 +679,11 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Bifurcation_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Bifurcation_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Bifurcation_info-round-{count}.json")
         create_config_file(dest_path, Bifurcation_data, count)
 
-    def openjij_solve_for_value(self, count=0, penalty = 10):
-        #np.save(f"LP_output_dwave\Openjij_round_{count}.npy", self.bifurcation_QUBO) # maybe for future use
+    def openjij_solve_for_value(self, count=0, penalty = DEFAULT_CUT_PENALTY):
+        # Save the solver input here if detailed QUBO inspection is needed.
         qubo_dict = {(i, j): self.bifurcation_QUBO[i, j]
              for i in range(self.bifurcation_QUBO.shape[0])
              for j in range(self.bifurcation_QUBO.shape[1])
@@ -700,8 +699,8 @@ class HQCMCBD_algorithm:
 
         best_sample = response.first.sample
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
-        best_bin_vector = np.array(list(best_sample.values()))
-        np.save(f"LP_output_dwave\LP_output_OJ_MAP_{count}.npy", best_bin_vector)
+        best_bin_vector = np.array([best_sample[i] for i in sorted(best_sample)])
+        np.save(os.path.join(self.quantum_LP_folder, f"LP_output_OJ_MAP_{count}.npy"), best_bin_vector)
         
         # Fill x matrix
         self.rearranged_bin_mat[0] = best_bin_vector[:self.num_binvars]
@@ -718,8 +717,15 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Bifurcation_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Openjij_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Openjij_info-round-{count}.json")
         create_config_file(dest_path, Bifurcation_data, count)
+
+    def _feasible_sampleset(self, sampleset, solver_name):
+        """Return feasible CQM samples or raise a clear solver error."""
+        feasible = sampleset.filter(lambda row: row.is_feasible)
+        if len(feasible.record.energy) == 0:
+            raise RuntimeError(f"{solver_name} returned no feasible samples for the master problem.")
+        return feasible
     
     def cqm_solve_for_value(self, count=0):
         # OBJ # Select a solver
@@ -728,10 +734,11 @@ class HQCMCBD_algorithm:
         sampleset = sampler.sample_cqm(self.cqm, label="Master_problem_HQCBD")
         et = time.time()
         exe_time = (et - st) * 1000
-        best = sampleset.filter(lambda row: row.is_feasible).first
+        feasible = self._feasible_sampleset(sampleset, "LeapHybridCQMSampler")
+        best = feasible.first
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
 
-        self.obj_value = sampleset.filter(lambda row: row.is_feasible).first.energy        
+        self.obj_value = feasible.first.energy
         
         local_lambda_lower = 0
         for key, val in best.sample.items():
@@ -753,7 +760,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Dwave_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Dwave_info-round-{count}.json")
         create_config_file(dest_path, Dwave_data, count)
     
     def cqm_solve_for_value_mul_cuts(self, count=0):
@@ -764,14 +771,15 @@ class HQCMCBD_algorithm:
         et = time.time()
         exe_time = (et - st) * 1000
         
-        data_length = len(sampleset.filter(lambda row: row.is_feasible).record.energy)
+        feasible = self._feasible_sampleset(sampleset, "LeapHybridCQMSampler")
+        data_length = len(feasible.record.energy)
         
         if self.mcut_num > data_length:
             print(f"Feasible answer from DWave is less than MCUT, We will use {data_length} cut in this round")
             
         self.final_mcut_num = min(self.mcut_num , data_length)
-        self.obj_value = np.min(sampleset.filter(lambda row: row.is_feasible).record.energy[:self.final_mcut_num])
-        best_data = sampleset.filter(lambda row: row.is_feasible).data()
+        self.obj_value = np.min(feasible.record.energy[:self.final_mcut_num])
+        best_data = feasible.data()
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
 
         Dwave_data = {}
@@ -783,7 +791,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Dwave_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Dwave_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Dwave_info-round-{count}.json")
         create_config_file(dest_path, Dwave_data, count)
         
         lambda_lower_list = []
@@ -823,7 +831,7 @@ class HQCMCBD_algorithm:
             "time_exec": exe_time
         }
         Gurobi_data["time_data"] = time_data
-        dest_path = os.path.join(os.getcwd(), "data_output", f"Gurobi_info-round-{count}.json")
+        dest_path = os.path.join(self.data_folder, f"Gurobi_info-round-{count}.json")
         create_config_file(dest_path, Gurobi_data, count)
         
         x_sol_MAP = self.MAP.getVars()
@@ -1033,13 +1041,13 @@ class HQCMCBD_algorithm:
             print("create feasibility cut")
             QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, np.zeros(self.lambda_bits), np.zeros(len(self.qubo_slack_dict.keys()))])
             QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = 10, dictionary = self.qubo_slack_dict)
+            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
             self.master_constraint_dict.update({f"c-round-{counter}-cut-{index}":  [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))] , equality , self.MAP_next_rhs] })
         elif statuscode == 2: # Optimal
             print("create optimality cut")
             QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, self.lambda_coeff, np.zeros(len(self.qubo_slack_dict.keys()))])
             QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = 10, dictionary = self.qubo_slack_dict)       
+            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
             self.master_constraint_dict.update({f"c-round-{counter}-cut-{index}":  [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))], [self.lambda_coeff], equality, self.MAP_next_rhs] })
                          
     def Add_master_constraint_bifurcation(self, counter = 0):
@@ -1057,26 +1065,31 @@ class HQCMCBD_algorithm:
             print("create feasibility cut")
             QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, np.zeros(self.lambda_bits), np.zeros(len(self.qubo_slack_dict.keys()))])
             QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = 10, dictionary = self.qubo_slack_dict)
+            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
             self.master_constraint_dict.update({f"c-round-{counter}": [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))], equality , self.MAP_next_rhs] })        
         elif statuscode == 2: # Optimal
             print("create optimality cut")
             QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, self.lambda_coeff, np.zeros(len(self.qubo_slack_dict.keys()))])
             QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = 10, dictionary = self.qubo_slack_dict)
+            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
             self.master_constraint_dict.update({f"c-round-{counter}":  [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))] \
                 + [self.lambda_coeff[n] for n in range(self.lambda_bits)] , equality, self.MAP_next_rhs] })
+
+    def _relative_gap_percent(self):
+        if self.lambda_upper == 0:
+            return 0 if self.lambda_lower == 0 else float("inf")
+        return np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) * 100, 3)
                 
     def run(self):
         lambda_upper_list = []
         lambda_lower_list = []
         obj_value_list = []
-        ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+        relative_gap = self._relative_gap_percent()
         abs_gap = abs(self.lambda_upper - self.lambda_lower)
-        cunt = 1
+        round_count = 1
         
         if self.threshold_type == "relative":
-            gap = ralative_gap
+            gap = relative_gap
         elif self.threshold_type == "absolute":
             gap = abs_gap
         
@@ -1084,12 +1097,12 @@ class HQCMCBD_algorithm:
             if self.dwave_solver in ["bifurcation", "openjij"]:
                 self.build_QUBO_master_problem()
                 while gap >= self.threshold_gap:
-                    print(f"Benders decomposition Round - {cunt}")
-                    self.solve_master_problem(cunt)
-                    self.build_gurobi_sub_problem(cunt)
-                    ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+                    print(f"Benders decomposition Round - {round_count}")
+                    self.solve_master_problem(round_count)
+                    self.build_gurobi_sub_problem(round_count)
+                    ratio = self._relative_gap_percent()
                     if self.Msense:
-                        print(f"Round {cunt}: \n \
+                        print(f"Round {round_count}: \n \
                             Current Objective value is {-1* self.obj_value}; \n \
                             lambda_upper is {-1*self.lambda_lower}; \n \
                             lambda_lower is {-1*self.lambda_upper}; \n \
@@ -1099,7 +1112,7 @@ class HQCMCBD_algorithm:
                         lambda_upper_list.append(-1*self.lambda_lower)
                         lambda_lower_list.append(-1*self.lambda_upper)                
                     else:
-                        print(f"Round {cunt}: \n \
+                        print(f"Round {round_count}: \n \
                             Current Objective value is {self.obj_value}; \n \
                             lambda_upper is {self.lambda_upper}; \n \
                             lambda_lower is {self.lambda_lower}; \n \
@@ -1109,28 +1122,28 @@ class HQCMCBD_algorithm:
                         lambda_upper_list.append(self.lambda_upper)
                         lambda_lower_list.append(self.lambda_lower)
                     
-                    ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+                    relative_gap = self._relative_gap_percent()
                     abs_gap = abs(self.lambda_upper - self.lambda_lower)
                     if self.threshold_type == "relative":
-                        gap = ralative_gap
+                        gap = relative_gap
                     elif self.threshold_type == "absolute":
                         gap = abs_gap
                     if gap < self.threshold_gap:
-                        print("optimal found, it takes", cunt, " Rounds.")
+                        print("optimal found, it takes", round_count, " Rounds.")
                         break                    
-                    cunt += 1
-                    if  cunt > self.max_steps:
-                        print("Max iteration reached, it takes", cunt, " Rounds.")
+                    round_count += 1
+                    if  round_count > self.max_steps:
+                        print("Max iteration reached, it takes", round_count, " Rounds.")
                         break
             else:
                 self.build_cqm_master_problem()
                 while gap >= self.threshold_gap:
-                    print(f"Benders decomposition Round - {cunt}")
-                    self.solve_master_problem(cunt)
-                    self.build_gurobi_sub_problem(cunt)
-                    ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3) 
+                    print(f"Benders decomposition Round - {round_count}")
+                    self.solve_master_problem(round_count)
+                    self.build_gurobi_sub_problem(round_count)
+                    ratio = self._relative_gap_percent()
                     if self.Msense:
-                        print(f"Round {cunt}: \n \
+                        print(f"Round {round_count}: \n \
                             Current Objective value is {-1* self.obj_value}; \n \
                             lambda_upper is {-1*self.lambda_lower}; \n \
                             lambda_lower is {-1*self.lambda_upper}; \n \
@@ -1140,7 +1153,7 @@ class HQCMCBD_algorithm:
                         lambda_upper_list.append(-1*self.lambda_lower)
                         lambda_lower_list.append(-1*self.lambda_upper)                
                     else:
-                        print(f"Round {cunt}: \n \
+                        print(f"Round {round_count}: \n \
                             Current Objective value is {self.obj_value}; \n \
                             lambda_upper is {self.lambda_upper}; \n \
                             lambda_lower is {self.lambda_lower}; \n \
@@ -1150,35 +1163,35 @@ class HQCMCBD_algorithm:
                         lambda_upper_list.append(self.lambda_upper)
                         lambda_lower_list.append(self.lambda_lower)
                 
-                    ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+                    relative_gap = self._relative_gap_percent()
                     abs_gap = abs(self.lambda_upper - self.lambda_lower)
                     
                     if self.threshold_type == "relative":
-                        gap = ralative_gap
+                        gap = relative_gap
                     elif self.threshold_type == "absolute":
                         gap = abs_gap
                     
                     if gap < self.threshold_gap:
-                        print("optimal found, it takes", cunt, " Rounds.")
+                        print("optimal found, it takes", round_count, " Rounds.")
                         break
-                    cunt += 1
-                    if  cunt > self.max_steps:
-                        print("Max iteration reached, it takes", cunt, " Rounds.")
+                    round_count += 1
+                    if  round_count > self.max_steps:
+                        print("Max iteration reached, it takes", round_count, " Rounds.")
                         break
             
         else:
             self.build_gurobi_master_problem()
             while gap >= self.threshold_gap:
                 
-                print(f"Benders decomposition Round - {cunt}")
+                print(f"Benders decomposition Round - {round_count}")
                 
-                self.solve_gurobi_master_problem(cunt)
-                self.build_gurobi_sub_problem(cunt)
+                self.solve_gurobi_master_problem(round_count)
+                self.build_gurobi_sub_problem(round_count)
                 
-                ratio = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+                ratio = self._relative_gap_percent()
                 
                 if self.Msense:
-                    print(f"Round {cunt}: \n \
+                    print(f"Round {round_count}: \n \
                         Current Objective value is {-1* self.obj_value}; \n \
                         lambda_upper is {-1*self.lambda_lower}; \n \
                         lambda_lower is {-1*self.lambda_upper}; \n \
@@ -1188,7 +1201,7 @@ class HQCMCBD_algorithm:
                     lambda_upper_list.append(-1*self.lambda_lower)
                     lambda_lower_list.append(-1*self.lambda_upper)                
                 else:
-                    print(f"Round {cunt}: \n \
+                    print(f"Round {round_count}: \n \
                         Current Objective value is {self.obj_value}; \n \
                         lambda_upper is {self.lambda_upper}; \n \
                         lambda_lower is {self.lambda_lower}; \n \
@@ -1198,19 +1211,19 @@ class HQCMCBD_algorithm:
                     lambda_upper_list.append(self.lambda_upper)
                     lambda_lower_list.append(self.lambda_lower)
                 
-                ralative_gap = np.round(abs(self.lambda_upper - self.lambda_lower) / abs(self.lambda_upper) *100 , 3)
+                relative_gap = self._relative_gap_percent()
                 abs_gap = abs(self.lambda_upper - self.lambda_lower)
                 
                 if self.threshold_type == "relative":
-                    gap = ralative_gap
+                    gap = relative_gap
                 elif self.threshold_type == "absolute":
                     gap = abs_gap
                 if gap < self.threshold_gap:
-                    print("optimal found, it takes", cunt, f" Rounds. The Binary results are stored at {self.data_folder}")
+                    print("optimal found, it takes", round_count, f" Rounds. The Binary results are stored at {self.data_folder}")
                     break
-                cunt += 1
-                if  cunt > self.max_steps:
-                    print("Max iteration reached, it takes", cunt, " Rounds.")
+                round_count += 1
+                if  round_count > self.max_steps:
+                    print("Max iteration reached, it takes", round_count, " Rounds.")
                     break
 
         lambda_upper_filepath = os.path.join(self.data_folder, "lambda_upper_list.json")
@@ -1227,4 +1240,3 @@ class HQCMCBD_algorithm:
         print(f"lambda_upper list has been saved to {lambda_upper_filepath}")
         print(f"lambda_lower list has been saved to {lambda_lower_filepath}")
         print(f"obj_value list has been saved to {obj_value_filepath}")
-        
