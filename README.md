@@ -1,8 +1,15 @@
 # HQCMCBD
 
+[![Project page](https://img.shields.io/badge/project%20page-online-c8102e)](https://djzts.github.io/HQCMCBD-API/)
+[![IEEE QCNC 2025](https://img.shields.io/badge/IEEE-QCNC%202025-00629b)](#citation)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2f7d32)](LICENSE)
+[![Video tutorial](https://img.shields.io/badge/video-tutorial-red)](https://www.youtube.com/watch?v=VcDaOj8W4MI)
+
 Hybrid Quantum-Classical Multi-cuts Benders' Decomposition for mixed-integer linear programming.
 
 HQCMCBD is a Python implementation of the Hybrid Quantum-Classical Multi-cuts Benders' Decomposition algorithm. It solves mixed-integer linear programming (MILP) problems by decomposing them into a binary master problem and continuous subproblems. The master problem can be solved classically with Gurobi or encoded for quantum and quantum-inspired solvers such as D-Wave CQM/BQM, OpenJij, and simulated bifurcation.
+
+**Project page: <https://djzts.github.io/HQCMCBD-API/>**. It explains the algorithm (master problem, solver backends, normal and L-shaped cuts, multi-cuts), walks through a quick start, shows results, and includes an interactive `config.json` builder.
 
 Tutorial: [HQCMCBD overview video](https://www.youtube.com/watch?v=VcDaOj8W4MI)
 
@@ -42,6 +49,7 @@ The repository currently does not include a `requirements.txt`, so install the s
 | `data_output/` | Runtime solution and metadata output. |
 | `LP_output/` | Debug LP exports from Gurobi models. |
 | `LP_output_dwave/` | Quantum and quantum-inspired solver output files. |
+| `docs/` | Source of the project page, published to GitHub Pages. |
 
 ## Quick Start
 
