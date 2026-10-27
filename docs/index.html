@@ -69,6 +69,7 @@
   <div class="wrap hero__grid">
     <div class="hero__text">
       <p class="eyebrow">IEEE QCNC 2025 · Open-source Python package</p>
+      <a class="newpill" href="#cuts"><span class="newpill__tag">v202610</span>New: Benders dual decomposition cuts</a>
       <h1>HQC-Bend</h1>
       <p class="hero__sub">Hybrid Quantum&#8209;Classical Multi&#8209;cuts Benders' Decomposition for (mixed&#8209;)integer linear programs.</p>
       <p class="lead">Give it a Gurobi model. HQC-Bend sends the <strong>binary master problem</strong> to a quantum or quantum-inspired annealer and the <strong>continuous subproblems</strong> to classical CPUs, then adds optimality and feasibility cuts until the bounds meet.</p>
@@ -104,7 +105,7 @@ solver.run()</code></pre>
   <div class="wrap">
     <ul class="stats" aria-label="At a glance">
       <li><span class="stats__n">6</span><span class="stats__l">master-problem backends, from Gurobi to D-Wave QPUs</span></li>
-      <li><span class="stats__n">2</span><span class="stats__l">cut-adding schemes: normal and L-shaped</span></li>
+      <li><span class="stats__n">3</span><span class="stats__l">cut-adding schemes: normal, L-shaped and Benders dual</span></li>
       <li><span class="stats__n">1</span><span class="stats__l">JSON file sets solver, cuts, precision and stopping rule</span></li>
       <li><span class="stats__n">MIT</span><span class="stats__l">licensed; runs as a Python script or in Jupyter</span></li>
     </ul>
@@ -232,7 +233,7 @@ solver.run()</code></pre>
       <article class="stage">
         <span class="stage__n">3</span>
         <h3>Subproblems &amp; cuts</h3>
-        <p>For each candidate, the subproblems run on CPUs 1…N with the <em>normal</em> or <em>L-shaped</em> scheme and return optimality or feasibility cuts to the MAP.</p>
+        <p>For each candidate, the subproblems run on CPUs 1…N with the <em>normal</em>, <em>L-shaped</em> or <em>Benders dual</em> scheme and return optimality or feasibility cuts to the MAP.</p>
         <p class="small muted">The loop repeats until the gap closes or <code>max_steps</code> is reached.</p>
       </article>
     </div>
@@ -254,6 +255,7 @@ solver.run()</code></pre>
       <li><strong>Modular structure.</strong> Preprocessing, master solvers and cut schemes are separate pieces you can extend.</li>
       <li><strong>Gurobi and Python native.</strong> Input is a plain <code>gurobipy</code> model. Runs as a script or in Jupyter Notebook.</li>
       <li><strong>Parallel subproblems.</strong> Multiple binary candidates are evaluated on CPU clusters.</li>
+      <li><strong>Stronger cuts.</strong> Benders dual decomposition lifts cuts on the LP relaxation of the master before the binary loop starts.</li>
       <li><strong>Several quantum backends.</strong> D-Wave BQM and CQM solvers, plus the OpenJij and simulated-bifurcation samplers.</li>
     </ul>
   </div>
@@ -297,7 +299,7 @@ solver.run()</code></pre>
       <article class="backend">
         <header><span class="chip chip--sim">Local</span><code>"bifurcation"</code></header>
         <h3>Simulated bifurcation</h3>
-        <p>GPU/CPU quantum-inspired Ising solver built on PyTorch.</p>
+        <p>Quantum-inspired Ising solver built on PyTorch, run by HQC-Bend on an NVIDIA GPU. <a href="https://djzts.github.io/GPU_acced_Q/">GPU install guide</a></p>
       </article>
     </div>
 
@@ -329,7 +331,7 @@ solver.run()</code></pre>
 <section class="section" id="cuts">
   <div class="wrap">
     <p class="kicker">05 · Cut-adding schemes</p>
-    <h2>Normal or L-shaped: two ways to cut</h2>
+    <h2>Three ways to cut: normal, L&#8209;shaped and Benders dual</h2>
     <p class="intro">Given a binary candidate <span class="m">\mathbf{x}^{*}</span> from the MAP, the subproblem produces a dual solution <span class="m">\mathbf{w}^{*}</span>, which becomes one of two cuts:</p>
 
     <div class="cutpair">
@@ -341,6 +343,7 @@ solver.run()</code></pre>
       <div class="tabs__list" role="tablist" aria-label="Cut-adding scheme">
         <button role="tab" id="tab-normal" aria-controls="panel-normal" aria-selected="true">1. Normal <code>"normal"</code></button>
         <button role="tab" id="tab-lshape" aria-controls="panel-lshape" aria-selected="false" tabindex="-1">2. L-shaped <code>"l_shape"</code></button>
+        <button role="tab" id="tab-bdd" aria-controls="panel-bdd" aria-selected="false" tabindex="-1">3. Benders dual <code>"bdd"</code></button>
       </div>
 
       <div class="tabs__panel" role="tabpanel" id="panel-normal" aria-labelledby="tab-normal">
@@ -377,6 +380,26 @@ solver.run()</code></pre>
           <li>If the objective is <strong>&gt; 0</strong>, <span class="m">\mathbf{x}^{*}</span> is infeasible: take <span class="m">\mathbf{w}^{*}</span> from DLSUB and add a <span class="tag tag--feas">feasibility cut</span>.</li>
           <li>If the objective is <strong>= 0</strong>, solve the dual subproblem and add an <span class="tag tag--opt">optimality cut</span>.</li>
         </ol>
+      </div>
+      <div class="tabs__panel" role="tabpanel" id="panel-bdd" aria-labelledby="tab-bdd" hidden>
+        <p class="panel-intro">Benders dual decomposition (<a href="https://doi.org/10.1287/opre.2019.1892">Rahmaniani et al., <em>Operations Research</em>, 2020</a>) gives the subproblem binary copies <span class="m">\mathbf{z}</span> of the master variables and prices the copy constraint <span class="m">\mathbf{z} = \mathbf{x}</span> into the objective with multipliers <span class="m">\boldsymbol{\pi}</span>.</p>
+        <div class="grid-2 gap-lg">
+          <div class="panel">
+            <h3>Lagrangian subproblem</h3>
+            <div class="math-block" data-tex="\begin{aligned} L(\boldsymbol{\pi}) = \min_{\mathbf{y},\mathbf{z}}\ & \mathbf{d}^{\intercal}\mathbf{y} - \boldsymbol{\pi}^{\intercal}\mathbf{z} \\ \text{s.t. }\ & \mathbf{A}\mathbf{z} + \mathbf{G}\mathbf{y} \leqq \mathbf{b}, \\ & \mathbf{H}\mathbf{z} \leqq \mathbf{e}, \\ & \mathbf{y} \ge \mathbf{0},\ \mathbf{z} \in \mathbb{B}^{n} \end{aligned}"></div>
+          </div>
+          <div class="panel">
+            <h3>BDD cuts</h3>
+            <div class="math-block" data-tex="\begin{aligned} \lambda \ &\ge\ L(\boldsymbol{\pi}) + \boldsymbol{\pi}^{\intercal}\mathbf{x} \quad \text{(optimality)} \\ 0 \ &\ge\ F(\boldsymbol{\beta}) + \boldsymbol{\beta}^{\intercal}\mathbf{x} \quad \text{(feasibility)} \end{aligned}"></div>
+            <p class="small muted"><span class="m">F(\boldsymbol{\beta})</span> is the same problem with a penalized slack <span class="m">\mathbf{s}</span> on every row and objective <span class="m">\mathbf{1}^{\intercal}\mathbf{s} - \boldsymbol{\beta}^{\intercal}\mathbf{z}</span>. With <span class="m">\boldsymbol{\pi}</span> fixed to the LP multipliers the cut keeps the classical slope and gets a higher right-hand side (strengthened cut); optimizing <span class="m">\boldsymbol{\pi}</span> gives a Lagrangian cut.</p>
+          </div>
+        </div>
+        <ol class="flow">
+          <li><strong>Phase 1 · classical.</strong> Solve the LP relaxation of the master and add classical cuts at its fractional points.</li>
+          <li><strong>Phase 2 · strengthened.</strong> Keep the LP multipliers and lift each cut by solving the MILP above (eq. 9–10, 12–13).</li>
+          <li><strong>Phase 3 · Lagrangian.</strong> Update <span class="m">\boldsymbol{\pi}</span> with a regularized cutting-plane step (eq. 15–16) to push the cut further.</li>
+        </ol>
+        <p class="small muted bdd-note">At a binary master point these cuts equal the classical ones, so BDD runs at the LP root before the first master solve and the main loop then adds L-shaped cuts. The subproblem MILPs also return feasible solutions; the best one is saved as an incumbent in <code>data_output/bdd_info.json</code>.</p>
       </div>
     </div>
 
@@ -417,7 +440,7 @@ solver.run()</code></pre>
           <legend>Algorithm</legend>
           <div class="field2">
             <label>Sub-method
-              <select name="submethod"><option value="l_shape">l_shape</option><option value="normal">normal</option></select>
+              <select name="submethod"><option value="l_shape">l_shape</option><option value="normal">normal</option><option value="bdd">bdd</option></select>
             </label>
             <label>Max steps <input type="number" name="max_steps" min="1" max="10000" value="20"></label>
             <label>Stopping rule
@@ -428,6 +451,16 @@ solver.run()</code></pre>
           <div class="toggles">
             <label class="switch"><input type="checkbox" name="hybrid" checked><span>Hybrid_mode (quantum master problem)</span></label>
             <label class="switch"><input type="checkbox" name="debug"><span>debug_mode (export LP files)</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset id="bddSet">
+          <legend>Benders dual decomposition (bdd)</legend>
+          <div class="field2">
+            <label>Root iterations <input type="number" name="bdd_root" min="0" max="1000" value="50"></label>
+            <label>Lagrangian iterations <input type="number" name="bdd_lag" min="0" max="100" value="10"></label>
+            <label>MIP gap <input type="number" name="bdd_gap" min="0" step="any" value="0.0001"></label>
+            <label>Time limit (s) <input type="number" name="bdd_time" min="1" step="any" value="60" placeholder="none"></label>
           </div>
         </fieldset>
 
@@ -480,7 +513,11 @@ solver.run()</code></pre>
             <tr><td><code>nonneg_bits_length</code></td><td>Bits for the non-negative integer part <span class="m">\lambda_{+}^{\mathbb{Z}}</span></td><td>positive integer</td></tr>
             <tr><td><code>decimal_bits_length</code></td><td>Bits for the positive fractional part <span class="m">\lambda_{+}^{\mathbb{Q}\setminus\mathbb{Z}}</span></td><td>positive integer</td></tr>
             <tr><td><code>negative_bits_length</code></td><td>Bits for the negative integer part <span class="m">\lambda_{-}^{\mathbb{Z}}</span></td><td>positive integer</td></tr>
-            <tr><td><code>submethod</code></td><td>Method for solving the subproblems</td><td><code>normal</code>, <code>l_shape</code></td></tr>
+            <tr><td><code>submethod</code></td><td>Method for solving the subproblems</td><td><code>normal</code>, <code>l_shape</code>, <code>bdd</code></td></tr>
+            <tr><td><code>bdd.root_iterations</code></td><td>Maximum LP iterations of the BDD root phase; <code>0</code> behaves like <code>l_shape</code></td><td>non-negative integer</td></tr>
+            <tr><td><code>bdd.lagrangian_iterations</code></td><td>Maximum multiplier updates per Lagrangian cut; <code>0</code> stops after strengthened cuts</td><td>non-negative integer</td></tr>
+            <tr><td><code>bdd.mip_gap</code></td><td>Gurobi <code>MIPGap</code> for the BDD subproblems</td><td>non-negative number</td></tr>
+            <tr><td><code>bdd.time_limit</code></td><td>Gurobi time limit in seconds for each BDD subproblem</td><td>positive number or <code>null</code></td></tr>
             <tr><td><code>debug_mode</code></td><td>Export LP files of the master problem and subproblems</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>Hybrid_mode</code></td><td>Solve the master problem with a quantum or quantum-inspired backend (Q+C) instead of Gurobi (C+C)</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.mode</code></td><td>How the MAP is encoded for the quantum solver</td><td><code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>, <code>openjij</code>, <code>bifurcation</code></td></tr>
@@ -513,6 +550,15 @@ solver.run()</code></pre>
 cd HQCMCBD-API
 pip install gurobipy numpy dimod dwave-system openjij torch simulated-bifurcation</code></pre></div>
         <p class="small muted">For the D-Wave modes (<code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>), set <code>DWAVE_API_TOKEN</code> in your environment rather than committing a token to the config file.</p>
+        <div class="gpu-note" id="gpu">
+          <h4>GPU-accelerated simulated bifurcation (<code>"bifurcation"</code>)</h4>
+          <p>The <code>bifurcation</code> backend calls <code>simulated_bifurcation.minimize(..., device="cuda")</code>, so it needs an NVIDIA GPU whose driver supports CUDA 11.8. The <a href="https://djzts.github.io/GPU_acced_Q/">GPU_acced_Q installation guide</a> covers the setup step by step: Python 3.10 (a conda environment is recommended), PyTorch 2.6.0 built for CUDA 11.8, and simulated-bifurcation 1.2.0. In short, run these after the install command above so the GPU build of PyTorch is not replaced:</p>
+          <div class="codecard"><button class="copy" type="button" aria-label="Copy code">Copy</button>
+<pre><code class="language-bash">pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+pip install simulated-bifurcation==1.2.0
+python -c "import torch, simulated_bifurcation as sb; print(torch.__version__, torch.cuda.is_available())"</code></pre></div>
+          <p class="small muted">The last command should print <code>2.6.0+cu118 True</code>. PyTorch's cu118 wheels include the CUDA runtime, so no separate CUDA Toolkit is needed. If it prints <code>False</code>, see the guide's troubleshooting section.</p>
+        </div>
       </li>
 
       <li class="qs__step">

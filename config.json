@@ -5,6 +5,12 @@
         "negative_bits_length": 8
     },
     "submethod": "l_shape",
+    "bdd": {
+        "root_iterations": 50,
+        "lagrangian_iterations": 10,
+        "mip_gap": 0.0001,
+        "time_limit": 60
+    },
     "debug_mode": true,
     "Hybrid_mode": true,
     "dwave": {

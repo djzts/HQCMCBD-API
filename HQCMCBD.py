@@ -17,6 +17,8 @@ import simulated_bifurcation as sb
 import openjij as oj
 
 
+__version__ = "v202610"
+
 DEFAULT_CONFIG_FILE = "config_default.json"
 MANUAL_CONFIG_FILE = "config.json"
 DATA_OUTPUT_DIR = "data_output"
@@ -217,6 +219,7 @@ class HQCMCBD_algorithm:
         config = load_config(config_file)
         lambda_config = config.get("lambda_var", {})
         submethod = config.get("submethod")
+        bdd_config = config.get("bdd", {})
         debug_mode = config.get("debug_mode")
         Hybrid_mode = config.get("Hybrid_mode")
         dwave_config = config.get("dwave", {})
@@ -231,9 +234,26 @@ class HQCMCBD_algorithm:
         self.threshold_gap = float(threshold_config.get("gap"))
         self.max_steps = int(config.get("max_steps"))
         self.Msense = 0
+        # Benders dual decomposition: root-phase limits and Gurobi settings for its MILP subproblems.
+        self.bdd_root_iterations = bdd_config.get("root_iterations", 50)
+        self.bdd_lagrangian_iterations = bdd_config.get("lagrangian_iterations", 10)
+        self.bdd_mip_gap = float(bdd_config.get("mip_gap", 1e-4))
+        self.bdd_time_limit = bdd_config.get("time_limit")
+        self.bdd_root_info = None
+        self.bdd_incumbent = None
 
-        if self.sub_method not in {"normal", "l_shape"}:
-            raise ValueError("submethod must be either 'normal' or 'l_shape'")
+        if self.sub_method not in {"normal", "l_shape", "bdd"}:
+            raise ValueError("submethod must be 'normal', 'l_shape' or 'bdd'")
+        for key, value in {
+            "root_iterations": self.bdd_root_iterations,
+            "lagrangian_iterations": self.bdd_lagrangian_iterations,
+        }.items():
+            if not isinstance(value, int) or value < 0:
+                raise ValueError(f"bdd.{key} must be a non-negative integer")
+        if self.bdd_mip_gap < 0:
+            raise ValueError("bdd.mip_gap must be non-negative")
+        if self.bdd_time_limit is not None and float(self.bdd_time_limit) <= 0:
+            raise ValueError("bdd.time_limit must be positive or null")
         if self.threshold_type not in {"absolute", "relative"}:
             raise ValueError("threshold.type must be either 'absolute' or 'relative'")
         if self.threshold_gap <= 0:
@@ -851,7 +871,7 @@ class HQCMCBD_algorithm:
                 if self.sub_method == "normal":
                     self.subproblem_normal(counter)
                     self.Add_master_constraint_bifurcation(counter)
-                elif self.sub_method == "l_shape":
+                elif self.sub_method in ("l_shape", "bdd"):
                     self.subproblem_Lshape(counter)
                     self.Add_master_constraint_bifurcation(counter)                   
                 else:
@@ -865,7 +885,7 @@ class HQCMCBD_algorithm:
                         if self.sub_method == "normal":
                             self.subproblem_normal(counter, i)
                             self.Add_master_constraint_Q(counter, i)
-                        elif self.sub_method == "l_shape":
+                        elif self.sub_method in ("l_shape", "bdd"):
                             self.subproblem_Lshape(counter, i)
                             self.Add_master_constraint_Q(counter, i)
                         else:
@@ -877,7 +897,7 @@ class HQCMCBD_algorithm:
                     if self.sub_method == "normal":
                         self.subproblem_normal(counter)
                         self.Add_master_constraint_Q(counter)
-                    elif self.sub_method == "l_shape":
+                    elif self.sub_method in ("l_shape", "bdd"):
                         self.subproblem_Lshape(counter)
                         self.Add_master_constraint_Q(counter)                   
                     else:
@@ -889,7 +909,8 @@ class HQCMCBD_algorithm:
             if self.sub_method == "normal":
                 self.subproblem_normal(counter)
                 self.Add_master_constraint_gurobi(counter)
-            elif self.sub_method == "l_shape":
+            elif self.sub_method in ("l_shape", "bdd"):
+                # At binary master points BDD cuts equal L-shaped cuts; BDD works in bdd_root_phase().
                 self.subproblem_Lshape(counter)
                 self.Add_master_constraint_gurobi(counter)            
             else:
@@ -1002,11 +1023,231 @@ class HQCMCBD_algorithm:
         #equality = ">="
         #self.lambda_upper = self.Lshape_sub_dual.objVal
 
+    def bdd_root_phase(self):
+        """Benders dual decomposition at the root (Rahmaniani et al., Oper. Res. 68(3), 2020).
+
+        At binary master points BDD cuts coincide with classical cuts, so, as in
+        Section 4.1 of the paper, BDD runs on the LP relaxation of the master:
+        classical cuts (phase 1), strengthened cuts (phase 2, eq. 10 and 13), then
+        Lagrangian cuts (phase 3, eq. 15-16). A phase ends when it finds no violated
+        cut or the root bound stalls for three iterations. Returns the cuts as
+        (lhs, rhs, is_optimality_cut) for add_bdd_root_cuts().
+        """
+        n = self.num_binvars
+        theta_lb = np.sum(self.lambda_coeff[self.lambda_coeff < 0])
+        self.BDD_root = gp.Model("BDD_root_LP")
+        self.BDD_root.setParam("LogToConsole", 0)
+        self.BDD_root.setParam("OutputFlag", 0)
+        x_theta = self.BDD_root.addMVar(shape = n + 1, lb = np.append(np.zeros(n), theta_lb), \
+                                        ub = np.append(np.ones(n), GRB.INFINITY), vtype = GRB.CONTINUOUS, name = 'x_theta')
+        self.BDD_root.setObjective(np.append(self.obj_c, 1) @ x_theta, GRB.MINIMIZE)
+        if len(self.rhs_map) > 0:
+            self.BDD_root.addMConstr(np.hstack((self.A_map, np.zeros((len(self.rhs_map), 1)))), x_theta, \
+                                     self.map_relation, self.rhs_map, name = 'BDD_root_MAP_constraints')
+
+        last_phase = 3 if self.bdd_lagrangian_iterations > 0 else 2
+        phase, stall = 1, 0
+        cuts, root_bounds, phase_counts = [], [], {1: 0, 2: 0, 3: 0}
+        for iteration in range(1, self.bdd_root_iterations + 1):
+            self.BDD_root.optimize()
+            if self.BDD_root.Status != GRB.OPTIMAL:
+                print(f"BDD root LP ended with status {self.BDD_root.Status}; stopping the root phase")
+                break
+            solution = x_theta.X
+            x_hat, theta_hat = solution[:n], solution[n]
+            bound = self.BDD_root.ObjVal
+            stall = stall + 1 if root_bounds and bound - root_bounds[-1] <= 1e-6 * max(1, abs(root_bounds[-1])) else 0
+            root_bounds.append(bound)
+            if stall >= 3:
+                if phase == last_phase:
+                    break
+                phase, stall = phase + 1, 0
+            print(f"BDD root iteration {iteration} (phase {phase}): LP bound is {-bound if self.Msense else bound}")
+
+            # Move to the next phase when the current one finds no violated cut at x_hat.
+            while True:
+                lhs, rhs, optimality = self.bdd_cut(x_hat, phase, iteration)
+                violation = rhs - lhs @ x_hat - (theta_hat if optimality else 0)
+                if violation > 1e-6 or phase == last_phase:
+                    break
+                phase, stall = phase + 1, 0
+            if violation <= 1e-6:
+                break
+            phase_counts[phase] += 1
+            cuts.append((lhs, rhs, optimality))
+            self.BDD_root.addMConstr(np.atleast_2d(np.append(lhs, 1 if optimality else 0)), x_theta, ">", np.array([rhs]), \
+                                     name = f'BDD_root_cut_{iteration}')
+
+        self.bdd_root_info = {
+            "root_bounds": [-value if self.Msense else value for value in root_bounds],
+            "cuts_per_phase": {"classical": phase_counts[1], "strengthened": phase_counts[2], "lagrangian": phase_counts[3]},
+        }
+        print(f"BDD root phase added {len(cuts)} cuts {self.bdd_root_info['cuts_per_phase']}")
+        # The root subproblems changed these; the binary loop starts from scratch.
+        self.lambda_upper = 1e30
+        self.lambda_lower = -1e30
+        return cuts
+
+    def bdd_cut(self, x_hat, phase, index = 0):
+        """Cut at a (possibly fractional) master point x_hat for the given BDD phase."""
+        self.rearranged_x = x_hat
+        self.subproblem_Lshape(0, index)
+        lhs, rhs = self.MAP_next_lhs, self.MAP_next_rhs
+        optimality = not self.L_shape_flag
+        if phase == 1:
+            return lhs, rhs, optimality
+        result = self.bdd_subproblem(lhs, not optimality, index)
+        if result is None:
+            return lhs, rhs, optimality
+        bound, z_bar, y_bar = result
+        rhs = max(rhs, bound)
+        if phase == 3 and optimality and z_bar is not None:
+            pi, lagrangian_rhs = self.bdd_lagrangian_cut(x_hat, -lhs, bound, z_bar, y_bar, index)
+            if lagrangian_rhs + pi @ x_hat > rhs - lhs @ x_hat:
+                lhs, rhs = -pi, lagrangian_rhs
+        return lhs, rhs, optimality
+
+    def bdd_subproblem(self, z_coeff, feasibility = False, index = 0):
+        """Solve the BDD subproblem over binary copies z of the master variables.
+
+        Optimality (eq. 9):  min d'y + z_coeff'z  over the subproblem and master rows.
+        Feasibility (eq. 12): min 1's + z_coeff'z  with slacks s on every row.
+        z_coeff is minus the multipliers of z = x. Returns (bound, z, y) where bound
+        is Gurobi's ObjBound, valid even if MIPGap or TimeLimit stops the search, and
+        (z, y) is the best solution found (None if there is none); None on failure.
+        """
+        num_y = len(self.obj_d)
+        num_sub_rows = len(self.rhs_sub)
+        num_rows = num_sub_rows + len(self.rhs_map)
+        relation = list(self.sub_relation) + list(self.map_relation)
+        rhs = np.concatenate((self.rhs_sub, self.rhs_map))
+
+        # Columns: [z | y | slacks]. Every row gets a "+" slack and equality rows a "-" slack too.
+        row_matrix = np.zeros((num_rows, self.num_binvars + num_y))
+        row_matrix[:num_sub_rows, :self.num_binvars] = self.A_sub
+        row_matrix[:num_sub_rows, self.num_binvars:] = self.G_sub
+        row_matrix[num_sub_rows:, :self.num_binvars] = self.A_map
+        objective = np.concatenate((z_coeff, np.zeros(num_y) if feasibility else self.obj_d))
+        if feasibility:
+            eq_rows = [row for row, symb in enumerate(relation) if symb == GRB.EQUAL]
+            minus_slack = np.zeros((num_rows, len(eq_rows)))
+            for col, row in enumerate(eq_rows):
+                minus_slack[row, col] = -1
+            row_matrix = np.hstack((row_matrix, np.eye(num_rows), minus_slack))
+            objective = np.concatenate((objective, np.ones(num_rows + len(eq_rows))))
+        vtypes = [GRB.BINARY] * self.num_binvars + [GRB.CONTINUOUS] * (len(objective) - self.num_binvars)
+
+        self.BDD_sub = gp.Model("Sub_BDD_feasibility" if feasibility else "Sub_BDD")
+        self.BDD_sub.setParam("LogToConsole", 0)
+        self.BDD_sub.setParam("OutputFlag", 0)
+        self.BDD_sub.setParam("MIPGap", self.bdd_mip_gap)
+        if self.bdd_time_limit is not None:
+            self.BDD_sub.setParam("TimeLimit", float(self.bdd_time_limit))
+        zy_sub = self.BDD_sub.addMVar(shape = len(objective), lb = 0, vtype = vtypes, name = 'zy_sub')
+        self.BDD_sub.setObjective(objective @ zy_sub, GRB.MINIMIZE)
+        self.BDD_sub.addMConstr(row_matrix, zy_sub, relation, rhs, name = 'BDD_sub_constraints')
+        self.BDD_sub.optimize()
+
+        if self.flag_print:
+            BDD_sub_path = os.path.join(self.LP_folder, f"sub_BDD_model-root-cut-{index}.lp")
+            self.BDD_sub.write(BDD_sub_path)
+        if self.BDD_sub.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.UNBOUNDED):
+            print(f"BDD subproblem ended with status {self.BDD_sub.Status}; keeping the classical cut")
+            return None
+        try:
+            bound = self.BDD_sub.ObjBound
+        except gp.GurobiError:
+            return None
+        if self.BDD_sub.SolCount == 0:
+            return bound, None, None
+        solution = zy_sub.X
+        z_bar = np.round(solution[:self.num_binvars])
+        y_bar = solution[self.num_binvars:self.num_binvars + num_y]
+        if not feasibility:
+            self.bdd_record_incumbent(z_bar, y_bar)
+        return bound, z_bar, y_bar
+
+    def bdd_lagrangian_cut(self, x_hat, pi, bound, z_bar, y_bar, index = 0):
+        """Phase 3: improve the multipliers pi of z = x_hat (eq. 15-16).
+
+        A regularized cutting-plane model over the subproblem solutions found so
+        far proposes multipliers close to the previous ones, and eq. (9) is solved
+        again for each. Stops after lagrangian_iterations updates or when the cut
+        value at x_hat improves by less than 0.1%. Returns the best (pi, bound).
+        """
+        n = self.num_binvars
+        bundle = [(self.obj_d @ y_bar, z_bar)]
+        best_pi, best_bound = pi, bound
+        best_value = previous_value = bound + pi @ x_hat
+        for step in range(1, self.bdd_lagrangian_iterations + 1):
+            delta = 1e-2 / (step + 1)
+            update = gp.Model("BDD_multiplier_update")
+            update.setParam("LogToConsole", 0)
+            update.setParam("OutputFlag", 0)
+            pi_var = update.addVars(n, lb = -GRB.INFINITY, name = 'pi')
+            eta = update.addVar(lb = -GRB.INFINITY, name = 'eta')
+            for d_y, z in bundle:
+                update.addConstr(eta <= d_y + quicksum(pi_var[i] * (x_hat[i] - z[i]) for i in range(n)))
+            update.setObjective(eta - delta / 2 * quicksum((pi_var[i] - pi[i]) * (pi_var[i] - pi[i]) for i in range(n)), GRB.MAXIMIZE)
+            update.optimize()
+            if update.Status != GRB.OPTIMAL:
+                break
+            pi = np.array([pi_var[i].X for i in range(n)])
+
+            result = self.bdd_subproblem(-pi, False, index)
+            if result is None or result[1] is None:
+                break
+            bound, z_bar, y_bar = result
+            bundle.append((self.obj_d @ y_bar, z_bar))
+            value = bound + pi @ x_hat
+            if value > best_value:
+                best_pi, best_bound, best_value = pi, bound, value
+            if value - previous_value < 1e-3 * max(1, abs(previous_value)):
+                break
+            previous_value = value
+        return best_pi, best_bound
+
+    def bdd_record_incumbent(self, z_bar, y_bar):
+        """Keep the best BDD subproblem solution; it satisfies every original constraint."""
+        if not np.all(y_bar <= np.array(self.Cont_UB) + 1e-6):
+            return
+        value = self.obj_c @ z_bar + self.obj_d @ y_bar
+        if self.bdd_incumbent is None or value < self.bdd_incumbent["internal_objective"] - 1e-9:
+            self.bdd_incumbent = {
+                "objective": -value if self.Msense else value,
+                "internal_objective": value,
+                "binary": dict(zip(self.Bin_varname[:self.num_binvars], z_bar.tolist())),
+                "continuous": dict(zip(self.Cont_varname, y_bar.tolist())),
+            }
+            print(f"BDD incumbent objective value is {self.bdd_incumbent['objective']}")
+
+    def add_bdd_root_cuts(self, cuts):
+        """Add the root-phase cuts to the binary master (Gurobi, QUBO or CQM)."""
+        equality = ">="
+        for k, (lhs, rhs, optimality) in enumerate(cuts):
+            if not self.Hybrid_mode:
+                if optimality:
+                    self.MAP.addConstr(lhs @ self.bin_x + self.lambda_coeff @ self.bin_lambda >= rhs, name = f'bdd_root_cut_{k}')
+                else:
+                    self.MAP.addConstr(lhs @ self.bin_x >= rhs, name = f'bdd_root_cut_{k}')
+            elif self.dwave_solver in ["bifurcation", "openjij"]:
+                QUBO_next_lhs = np.concatenate([lhs, self.lambda_coeff if optimality else np.zeros(self.lambda_bits), \
+                                                np.zeros(len(self.qubo_slack_dict.keys()))])
+                # Negative round numbers keep the slack names apart from the binary loop's.
+                self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, rhs, \
+                    round_num = -(k + 1), penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
+            else:
+                expr = sum(lhs[i] * self.bin_x_cqm[i] for i in range(self.num_binvars))
+                if optimality:
+                    expr += sum(self.lambda_coeff[j] * self.bin_lambda_cqm[j] for j in range(self.lambda_bits))
+                self.cqm.add_constraint(expr >= rhs, label = f'CQM_BDD_root_cut_{k}')
+            self.master_constraint_dict[f"bdd-root-cut-{k}"] = [list(lhs), equality, rhs]
+
     def Add_master_constraint_gurobi(self, counter = 0, index = 0):
             equality = ">="
             if self.sub_method == "normal":
                 statuscode = self.Normal_sub_dual.getAttr(GRB.Attr.Status)
-            elif self.sub_method == "l_shape":
+            elif self.sub_method in ("l_shape", "bdd"):
                 if self.L_shape_flag:
                     statuscode = 5 #self.Lshape_sub_dual.getAttr(GRB.Attr.Status)
                 else:
@@ -1030,7 +1271,7 @@ class HQCMCBD_algorithm:
         equality = ">="
         if self.sub_method == "normal":
             statuscode = self.Normal_sub_dual.getAttr(GRB.Attr.Status)
-        elif self.sub_method == "l_shape":
+        elif self.sub_method in ("l_shape", "bdd"):
             if self.L_shape_flag:
                 statuscode = 5 #self.Lshape_sub_dual.getAttr(GRB.Attr.Status)
             else:
@@ -1054,7 +1295,7 @@ class HQCMCBD_algorithm:
         equality = ">="
         if self.sub_method == "normal":
             statuscode = self.Normal_sub_dual.getAttr(GRB.Attr.Status)
-        elif self.sub_method == "l_shape":
+        elif self.sub_method in ("l_shape", "bdd"):
             if self.L_shape_flag:
                 statuscode = 5 #self.Lshape_sub_dual.getAttr(GRB.Attr.Status)
             else:
@@ -1096,6 +1337,8 @@ class HQCMCBD_algorithm:
         if self.Hybrid_mode:       
             if self.dwave_solver in ["bifurcation", "openjij"]:
                 self.build_QUBO_master_problem()
+                if self.sub_method == "bdd":
+                    self.add_bdd_root_cuts(self.bdd_root_phase())
                 while gap >= self.threshold_gap:
                     print(f"Benders decomposition Round - {round_count}")
                     self.solve_master_problem(round_count)
@@ -1137,6 +1380,8 @@ class HQCMCBD_algorithm:
                         break
             else:
                 self.build_cqm_master_problem()
+                if self.sub_method == "bdd":
+                    self.add_bdd_root_cuts(self.bdd_root_phase())
                 while gap >= self.threshold_gap:
                     print(f"Benders decomposition Round - {round_count}")
                     self.solve_master_problem(round_count)
@@ -1181,6 +1426,8 @@ class HQCMCBD_algorithm:
             
         else:
             self.build_gurobi_master_problem()
+            if self.sub_method == "bdd":
+                self.add_bdd_root_cuts(self.bdd_root_phase())
             while gap >= self.threshold_gap:
                 
                 print(f"Benders decomposition Round - {round_count}")
@@ -1240,3 +1487,12 @@ class HQCMCBD_algorithm:
         print(f"lambda_upper list has been saved to {lambda_upper_filepath}")
         print(f"lambda_lower list has been saved to {lambda_lower_filepath}")
         print(f"obj_value list has been saved to {obj_value_filepath}")
+
+        if self.bdd_root_info is not None:
+            bdd_info = dict(self.bdd_root_info)
+            if self.bdd_incumbent is not None:
+                bdd_info["incumbent"] = {key: val for key, val in self.bdd_incumbent.items() if key != "internal_objective"}
+            bdd_info_filepath = os.path.join(self.data_folder, "bdd_info.json")
+            with open(bdd_info_filepath, 'w') as json_file:
+                json.dump(bdd_info, json_file, indent=4)
+            print(f"BDD root bounds and incumbent have been saved to {bdd_info_filepath}")

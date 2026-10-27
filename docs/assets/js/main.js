@@ -162,7 +162,8 @@
   // Values of config_default.json in HQCMCBD-API.
   var DEFAULTS = {
     nonneg: 15, decimal: 4, negative: 15,
-    submethod: "l_shape", debug: false, hybrid: true,
+    submethod: "l_shape", bdd_root: 50, bdd_lag: 10, bdd_gap: 0.0001, bdd_time: 60,
+    debug: false, hybrid: true,
     dmode: "cqm", token: "YOUR_DWAVE_TOKEN", mcut: true, cutnums: 2, reads: 100,
     ttype: "absolute", gap: 0.5, max_steps: 20
   };
@@ -173,6 +174,7 @@
   var info = document.getElementById("lambdaInfo");
   var note = document.getElementById("cfgNote");
   var dwaveSet = document.getElementById("dwaveSet");
+  var bddSet = document.getElementById("bddSet");
   var el = form.elements;
 
   function intVal(name, fallback) {
@@ -188,6 +190,15 @@
     var v = parseFloat(el[name].value);
     return isNaN(v) || v <= 0 ? fallback : v;
   }
+  function nonNegVal(name, fallback) {
+    var v = parseFloat(el[name].value);
+    return isNaN(v) || v < 0 ? fallback : v;
+  }
+  // An empty time limit means no limit (null in config.json).
+  function optionalPositiveVal(name) {
+    var v = parseFloat(el[name].value);
+    return isNaN(v) || v <= 0 ? null : v;
+  }
   function fmt(n) {
     return n.toLocaleString("en-US", { maximumFractionDigits: 12 });
   }
@@ -200,6 +211,12 @@
         negative_bits_length: intVal("negative", DEFAULTS.negative)
       },
       submethod: el.submethod.value,
+      bdd: {
+        root_iterations: intVal("bdd_root", DEFAULTS.bdd_root),
+        lagrangian_iterations: intVal("bdd_lag", DEFAULTS.bdd_lag),
+        mip_gap: nonNegVal("bdd_gap", DEFAULTS.bdd_gap),
+        time_limit: optionalPositiveVal("bdd_time")
+      },
       debug_mode: el.debug.checked,
       Hybrid_mode: el.hybrid.checked,
       dwave: {
@@ -234,6 +251,7 @@
     info.innerHTML = T.lambda(fmt(lo), fmt(hi), fmt(step), N + D + M);
 
     dwaveSet.disabled = !cfg.Hybrid_mode;
+    bddSet.disabled = cfg.submethod !== "bdd";
     el.cutnums.disabled = !cfg.dwave.Mcut_flag;
 
     var msg = "";
@@ -254,6 +272,10 @@
     el.decimal.value = d.decimal;
     el.negative.value = d.negative;
     el.submethod.value = d.submethod;
+    el.bdd_root.value = d.bdd_root;
+    el.bdd_lag.value = d.bdd_lag;
+    el.bdd_gap.value = d.bdd_gap;
+    el.bdd_time.value = d.bdd_time;
     el.debug.checked = d.debug;
     el.hybrid.checked = d.hybrid;
     el.dmode.value = d.dmode;

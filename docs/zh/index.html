@@ -63,6 +63,7 @@
   <div class="wrap hero__grid">
     <div class="hero__text">
       <p class="eyebrow">IEEE QCNC 2025 · 开源 Python 包</p>
+      <a class="newpill" href="#cuts"><span class="newpill__tag">v202610</span>新增：Benders 对偶分解割</a>
       <h1>HQC-Bend</h1>
       <p class="hero__sub">面向（混合）整数线性规划的混合量子-经典多割 Benders 分解算法。</p>
       <p class="lead">输入一个 Gurobi 模型，HQC-Bend 会把<strong>二进制主问题</strong>交给量子或量子启发式退火器，把<strong>连续子问题</strong>交给经典 CPU，并不断添加最优性割和可行性割，直到上下界收敛。</p>
@@ -98,7 +99,7 @@ solver.run()</code></pre>
   <div class="wrap">
     <ul class="stats" aria-label="概览">
       <li><span class="stats__n">6</span><span class="stats__l">种主问题求解后端，从 Gurobi 到 D-Wave QPU</span></li>
-      <li><span class="stats__n">2</span><span class="stats__l">种加割方案：normal 与 L-shaped</span></li>
+      <li><span class="stats__n">3</span><span class="stats__l">种加割方案：normal、L-shaped 与 Benders 对偶分解</span></li>
       <li><span class="stats__n">1</span><span class="stats__l">个 JSON 文件即可设定求解器、割平面、精度和停止准则</span></li>
       <li><span class="stats__n">MIT</span><span class="stats__l">许可证；可作为 Python 脚本或在 Jupyter 中运行</span></li>
     </ul>
@@ -226,7 +227,7 @@ solver.run()</code></pre>
       <article class="stage">
         <span class="stage__n">3</span>
         <h3>子问题与割平面</h3>
-        <p>对每个候选解，子问题在 CPU 1…N 上以 <em>normal</em> 或 <em>L-shaped</em> 方案求解，并向 MAP 返回最优性割或可行性割。</p>
+        <p>对每个候选解，子问题在 CPU 1…N 上以 <em>normal</em>、<em>L-shaped</em> 或 <em>bdd</em> 方案求解，并向 MAP 返回最优性割或可行性割。</p>
         <p class="small muted">循环持续进行，直到间隙收敛或达到 <code>max_steps</code>。</p>
       </article>
     </div>
@@ -248,6 +249,7 @@ solver.run()</code></pre>
       <li><strong>模块化结构。</strong>预处理、主问题求解器和加割方案相互独立，便于扩展。</li>
       <li><strong>原生支持 Gurobi 和 Python。</strong>输入就是普通的 <code>gurobipy</code> 模型，可作为脚本运行，也可在 Jupyter Notebook 中运行。</li>
       <li><strong>子问题并行。</strong>多个二进制候选解在 CPU 集群上同时评估。</li>
+      <li><strong>更强的割。</strong>Benders 对偶分解在二进制循环开始前，先在主问题的 LP 松弛上提升割。</li>
       <li><strong>多种量子后端。</strong>支持 D-Wave BQM 和 CQM 求解器，以及 OpenJij 和模拟分岔采样器。</li>
     </ul>
   </div>
@@ -291,7 +293,7 @@ solver.run()</code></pre>
       <article class="backend">
         <header><span class="chip chip--sim">本地</span><code>"bifurcation"</code></header>
         <h3>模拟分岔</h3>
-        <p>基于 PyTorch 的 GPU/CPU 量子启发式 Ising 求解器。</p>
+        <p>基于 PyTorch 的量子启发式 Ising 求解器，HQC-Bend 在 NVIDIA GPU 上运行它。<a href="https://djzts.github.io/GPU_acced_Q/">GPU 安装指南</a></p>
       </article>
     </div>
 
@@ -323,7 +325,7 @@ solver.run()</code></pre>
 <section class="section" id="cuts">
   <div class="wrap">
     <p class="kicker">05 · 加割方案</p>
-    <h2>Normal 与 L-shaped：两种加割方式</h2>
+    <h2>三种加割方式：Normal、L&#8209;shaped 与 Benders 对偶分解</h2>
     <p class="intro">对于 MAP 给出的二进制候选解 <span class="m">\mathbf{x}^{*}</span>，子问题会产生对偶解 <span class="m">\mathbf{w}^{*}</span>，并据此生成以下两种割之一：</p>
 
     <div class="cutpair">
@@ -335,6 +337,7 @@ solver.run()</code></pre>
       <div class="tabs__list" role="tablist" aria-label="加割方案">
         <button role="tab" id="tab-normal" aria-controls="panel-normal" aria-selected="true">1. 常规方案 <code>"normal"</code></button>
         <button role="tab" id="tab-lshape" aria-controls="panel-lshape" aria-selected="false" tabindex="-1">2. L 形方案 <code>"l_shape"</code></button>
+        <button role="tab" id="tab-bdd" aria-controls="panel-bdd" aria-selected="false" tabindex="-1">3. Benders 对偶 <code>"bdd"</code></button>
       </div>
 
       <div class="tabs__panel" role="tabpanel" id="panel-normal" aria-labelledby="tab-normal">
@@ -371,6 +374,26 @@ solver.run()</code></pre>
           <li>若目标值 <strong>&gt; 0</strong>，说明 <span class="m">\mathbf{x}^{*}</span> 不可行：由 DLSUB 得到 <span class="m">\mathbf{w}^{*}</span>，添加一条<span class="tag tag--feas">可行性割</span>。</li>
           <li>若目标值 <strong>= 0</strong>，求解对偶子问题并添加一条<span class="tag tag--opt">最优性割</span>。</li>
         </ol>
+      </div>
+      <div class="tabs__panel" role="tabpanel" id="panel-bdd" aria-labelledby="tab-bdd" hidden>
+        <p class="panel-intro">Benders 对偶分解（<a href="https://doi.org/10.1287/opre.2019.1892">Rahmaniani 等，<em>Operations Research</em>，2020</a>）为子问题引入主问题变量的二进制副本 <span class="m">\mathbf{z}</span>，并用乘子 <span class="m">\boldsymbol{\pi}</span> 把副本约束 <span class="m">\mathbf{z} = \mathbf{x}</span> 松弛到目标函数中。</p>
+        <div class="grid-2 gap-lg">
+          <div class="panel">
+            <h3>拉格朗日子问题</h3>
+            <div class="math-block" data-tex="\begin{aligned} L(\boldsymbol{\pi}) = \min_{\mathbf{y},\mathbf{z}}\ & \mathbf{d}^{\intercal}\mathbf{y} - \boldsymbol{\pi}^{\intercal}\mathbf{z} \\ \text{s.t. }\ & \mathbf{A}\mathbf{z} + \mathbf{G}\mathbf{y} \leqq \mathbf{b}, \\ & \mathbf{H}\mathbf{z} \leqq \mathbf{e}, \\ & \mathbf{y} \ge \mathbf{0},\ \mathbf{z} \in \mathbb{B}^{n} \end{aligned}"></div>
+          </div>
+          <div class="panel">
+            <h3>BDD 割</h3>
+            <div class="math-block" data-tex="\begin{aligned} \lambda \ &\ge\ L(\boldsymbol{\pi}) + \boldsymbol{\pi}^{\intercal}\mathbf{x} \quad \text{（最优性割）} \\ 0 \ &\ge\ F(\boldsymbol{\beta}) + \boldsymbol{\beta}^{\intercal}\mathbf{x} \quad \text{（可行性割）} \end{aligned}"></div>
+            <p class="small muted"><span class="m">F(\boldsymbol{\beta})</span> 是在每一行加入带惩罚的松弛变量 <span class="m">\mathbf{s}</span>、目标为 <span class="m">\mathbf{1}^{\intercal}\mathbf{s} - \boldsymbol{\beta}^{\intercal}\mathbf{z}</span> 的同一问题。把 <span class="m">\boldsymbol{\pi}</span> 固定为 LP 乘子时，割的斜率与经典割相同、右端项更高（加强割）；进一步优化 <span class="m">\boldsymbol{\pi}</span> 则得到拉格朗日割。</p>
+          </div>
+        </div>
+        <ol class="flow">
+          <li><strong>阶段 1 · 经典割。</strong>求解主问题的 LP 松弛，在其分数解处添加经典割。</li>
+          <li><strong>阶段 2 · 加强割。</strong>保持 LP 乘子不变，通过求解上面的 MILP 提升每个割（式 9–10、12–13）。</li>
+          <li><strong>阶段 3 · 拉格朗日割。</strong>用带正则项的割平面步骤（式 15–16）更新 <span class="m">\boldsymbol{\pi}</span>，进一步提升割。</li>
+        </ol>
+        <p class="small muted bdd-note">在二进制主问题解处，这些割与经典割相同，因此 BDD 在第一次求解主问题之前、于 LP 根节点运行，之后的主循环添加 L-shaped 割。子问题 MILP 还会给出可行解，其中最好的一个作为当前最优解保存在 <code>data_output/bdd_info.json</code> 中。</p>
       </div>
     </div>
 
@@ -411,7 +434,7 @@ solver.run()</code></pre>
           <legend>算法</legend>
           <div class="field2">
             <label>子问题方法
-              <select name="submethod"><option value="l_shape">l_shape</option><option value="normal">normal</option></select>
+              <select name="submethod"><option value="l_shape">l_shape</option><option value="normal">normal</option><option value="bdd">bdd</option></select>
             </label>
             <label>最大迭代次数 <input type="number" name="max_steps" min="1" max="10000" value="20"></label>
             <label>停止准则
@@ -422,6 +445,16 @@ solver.run()</code></pre>
           <div class="toggles">
             <label class="switch"><input type="checkbox" name="hybrid" checked><span>Hybrid_mode（用量子方法求解主问题）</span></label>
             <label class="switch"><input type="checkbox" name="debug"><span>debug_mode（导出 LP 文件）</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset id="bddSet">
+          <legend>Benders 对偶分解（bdd）</legend>
+          <div class="field2">
+            <label>根节点迭代次数 <input type="number" name="bdd_root" min="0" max="1000" value="50"></label>
+            <label>拉格朗日迭代次数 <input type="number" name="bdd_lag" min="0" max="100" value="10"></label>
+            <label>MIP 间隙 <input type="number" name="bdd_gap" min="0" step="any" value="0.0001"></label>
+            <label>时间限制（秒） <input type="number" name="bdd_time" min="1" step="any" value="60" placeholder="无"></label>
           </div>
         </fieldset>
 
@@ -474,7 +507,11 @@ solver.run()</code></pre>
             <tr><td><code>nonneg_bits_length</code></td><td>非负整数部分的位数 <span class="m">\lambda_{+}^{\mathbb{Z}}</span></td><td>正整数</td></tr>
             <tr><td><code>decimal_bits_length</code></td><td>正小数部分的位数 <span class="m">\lambda_{+}^{\mathbb{Q}\setminus\mathbb{Z}}</span></td><td>正整数</td></tr>
             <tr><td><code>negative_bits_length</code></td><td>负整数部分的位数 <span class="m">\lambda_{-}^{\mathbb{Z}}</span></td><td>正整数</td></tr>
-            <tr><td><code>submethod</code></td><td>子问题的求解方法</td><td><code>normal</code>, <code>l_shape</code></td></tr>
+            <tr><td><code>submethod</code></td><td>子问题的求解方法</td><td><code>normal</code>, <code>l_shape</code>, <code>bdd</code></td></tr>
+            <tr><td><code>bdd.root_iterations</code></td><td>BDD 根节点阶段的最大 LP 迭代次数；为 <code>0</code> 时等同于 <code>l_shape</code></td><td>非负整数</td></tr>
+            <tr><td><code>bdd.lagrangian_iterations</code></td><td>每个拉格朗日割的最大乘子更新次数；为 <code>0</code> 时只生成加强割</td><td>非负整数</td></tr>
+            <tr><td><code>bdd.mip_gap</code></td><td>BDD 子问题的 Gurobi <code>MIPGap</code></td><td>非负数</td></tr>
+            <tr><td><code>bdd.time_limit</code></td><td>每个 BDD 子问题的 Gurobi 时间限制（秒）</td><td>正数或 <code>null</code></td></tr>
             <tr><td><code>debug_mode</code></td><td>导出主问题和子问题的 LP 文件</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>Hybrid_mode</code></td><td>用量子或量子启发式后端求解主问题（Q+C），而不是用 Gurobi（C+C）</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.mode</code></td><td>MAP 交给量子求解器时的编码方式</td><td><code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>, <code>openjij</code>, <code>bifurcation</code></td></tr>
@@ -507,6 +544,15 @@ solver.run()</code></pre>
 cd HQCMCBD-API
 pip install gurobipy numpy dimod dwave-system openjij torch simulated-bifurcation</code></pre></div>
         <p class="small muted">使用 D-Wave 模式（<code>cqm</code>、<code>bqm_hybrid</code>、<code>bqm_quantum</code>）时，请在环境变量中设置 <code>DWAVE_API_TOKEN</code>，不要把令牌提交到配置文件中。</p>
+        <div class="gpu-note" id="gpu">
+          <h4>GPU 加速的模拟分岔（<code>"bifurcation"</code>）</h4>
+          <p><code>bifurcation</code> 后端调用 <code>simulated_bifurcation.minimize(..., device="cuda")</code>，因此需要一块驱动支持 CUDA 11.8 的 NVIDIA 显卡。<a href="https://djzts.github.io/GPU_acced_Q/">GPU_acced_Q 安装指南</a>一步步介绍了环境搭建：Python 3.10（推荐用 conda 新建环境）、CUDA 11.8 版 PyTorch 2.6.0 以及 simulated-bifurcation 1.2.0。简要步骤如下，请在上面的安装命令<strong>之后</strong>运行，以免 GPU 版 PyTorch 被替换：</p>
+          <div class="codecard"><button class="copy" type="button" aria-label="复制代码">复制</button>
+<pre><code class="language-bash">pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+pip install simulated-bifurcation==1.2.0
+python -c "import torch, simulated_bifurcation as sb; print(torch.__version__, torch.cuda.is_available())"</code></pre></div>
+          <p class="small muted">最后一条命令应输出 <code>2.6.0+cu118 True</code>。PyTorch 的 cu118 安装包已自带 CUDA 运行库，无需另装 CUDA Toolkit。如果输出 <code>False</code>，请参考指南中的常见问题。</p>
+        </div>
       </li>
 
       <li class="qs__step">
