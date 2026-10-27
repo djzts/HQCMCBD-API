@@ -154,6 +154,17 @@ These files are useful for debugging and reproducing experiments, but they may b
 - Maximization models are converted internally to minimization and reported back with the original sign convention.
 - `HQCMCBD_notebook.ipynb` intentionally loads `HQCMCBD.py` instead of duplicating the implementation.
 
+## Research Using HQC-Bend
+
+Peer-reviewed work that applies the hybrid quantum-classical Benders' decomposition method:
+
+- M. Li, S. Wang, L. Fan, Z. Han, "[Quantum assisted combinatorial Benders' algorithm for the synergy of hydrogen and power distribution systems with mobile storage](https://ieeexplore.ieee.org/abstract/document/10841900/)," *IEEE Transactions on Power Systems*, vol. 40, no. 5, pp. 3967–3978, 2025.
+- Y. Zhang, Y. Gong, L. Fan, Y. Wang, Z. Han, Y. Guo, "[Quantum-Assisted Online Task Offloading and Resource Allocation in MEC-Enabled Satellite-Aerial-Terrestrial Integrated Networks](https://ieeexplore.ieee.org/abstract/document/10804104/)," *IEEE Transactions on Mobile Computing*, 2024.
+- Y. Zhang, Y. Gong, L. Fan, Y. Wang, Z. Han, Y. Guo, "[Quantum-assisted joint virtual network function deployment and maximum flow routing for space information networks](https://ieeexplore.ieee.org/abstract/document/10691643/)," *IEEE Transactions on Mobile Computing*, vol. 24, no. 2, pp. 830–844, 2025.
+- X. Wei, L. Fan, Y. Guo, Y. Gong, Z. Han, Y. Wang, "[Hybrid quantum–classical Benders' decomposition for federated learning scheduling in distributed networks](https://ieeexplore.ieee.org/abstract/document/10636852/)," *IEEE Transactions on Network Science and Engineering*, vol. 11, no. 6, pp. 6038–6051, 2024.
+- Y. Zhang, Y. Gong, L. Fan, Y. Wang, Z. Han, Y. Guo, "[Quantum-assisted joint caching and power allocation for integrated satellite-terrestrial networks](https://ieeexplore.ieee.org/abstract/document/10614917/)," *IEEE Transactions on Network Science and Engineering*, vol. 11, no. 6, pp. 5163–5174, 2024.
+- X. Wei, L. Fan, Y. Guo, Y. Gong, Z. Han, Y. Wang, "[Quantum assisted scheduling algorithm for federated learning in distributed networks](https://ieeexplore.ieee.org/abstract/document/10230094/)," *2023 32nd International Conference on Computer Communications and Networks (ICCCN)*, IEEE, pp. 1–10, 2023.
+
 ## Contact
 
 - Zhongqi Zhao: [zzhao27@uh.edu](mailto:zzhao27@uh.edu)
@@ -165,7 +176,7 @@ Zhongqi Zhao, Mingze Li, Lei Fan, Zhu Han.
 
 ## Citation
 
-If you use HQCMCBD in your work, please cite:
+If you use HQCMCBD in your work, please cite the [QCNC 2025 paper](https://ieeexplore.ieee.org/abstract/document/11000177/):
 
 ```bibtex
 @inproceedings{zhao2025hqc,

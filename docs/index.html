@@ -33,13 +33,14 @@
     <a class="brand" href="#top"><span class="brand__mark">HQ</span><span>HQC-Bend</span></a>
     <ul class="topnav__links">
       <li><a href="#motivation">Motivation</a></li>
-      <li><a href="#how">How it works</a></li>
+      <li><a href="#how">Method</a></li>
       <li><a href="#solvers">Solvers</a></li>
       <li><a href="#cuts">Cuts</a></li>
       <li><a href="#config">Configure</a></li>
       <li><a href="#quickstart">Quick start</a></li>
       <li><a href="#results">Results</a></li>
-      <li><a href="#datacenter">Data center</a></li>
+      <li><a href="#datacenter">Application</a></li>
+      <li><a href="#research">Research</a></li>
       <li><a href="#cite">Cite</a></li>
     </ul>
     <div class="topnav__actions">
@@ -69,6 +70,7 @@
       <div class="cta">
         <a class="btn btn--primary" href="#quickstart">Get started</a>
         <a class="btn" href="https://github.com/djzts/HQCMCBD-API">Source code</a>
+        <a class="btn" href="https://ieeexplore.ieee.org/abstract/document/11000177/">Paper</a>
         <a class="btn" href="https://www.youtube.com/watch?v=VcDaOj8W4MI">Video tutorial</a>
         <a class="btn" href="#cite">Cite</a>
       </div>
@@ -696,12 +698,71 @@ optimal found, it takes 4  Rounds.</code></pre></div>
   </div>
 </section>
 
-<!-- ============ CITE ============ -->
-<section class="section section--alt" id="cite">
+<!-- ============ RESEARCH ============ -->
+<section class="section section--alt" id="research">
   <div class="wrap">
-    <p class="kicker">10 · Citation</p>
+    <p class="kicker">10 · Research using HQC-Bend</p>
+    <h2>Published work built on the method</h2>
+    <p class="intro">The same idea (a binary master problem solved on quantum hardware, with classical solvers handling the continuous subproblems) has been applied in peer-reviewed work on satellite and space networks, federated learning and energy systems.</p>
+    <ul class="papercount" aria-label="Summary">
+      <li><span>6</span>peer-reviewed papers</li>
+      <li><span>5</span>IEEE journal articles</li>
+      <li><span>2023–2025</span>published</li>
+    </ul>
+    <ol class="papers">
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--energy">Energy systems</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10841900/">Quantum assisted combinatorial Benders' algorithm for the synergy of hydrogen and power distribution systems with mobile storage</a></h3>
+        <p class="paper__authors">Mingze Li, Siyuan Wang, Lei Fan, Zhu Han</p>
+        <p class="paper__venue"><em>IEEE Transactions on Power Systems</em>, vol. 40, no. 5, pp. 3967–3978, 2025</p>
+        <p class="paper__what">Co-schedules hydrogen and power distribution systems, including the routes and loading of truck-mounted mobile hydrogen storage. The master problem runs as a QUBO on a quantum annealer and the subproblems on a classical CPU.</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">Satellite networks</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10804104/">Quantum-Assisted Online Task Offloading and Resource Allocation in MEC-Enabled Satellite-Aerial-Terrestrial Integrated Networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Mobile Computing</em>, 2024</p>
+        <p class="paper__what">Minimizes service delay for IoT devices served by LEO satellites, high-altitude platforms and ground base stations. A Lyapunov-based online controller splits the stochastic problem into per-slot problems that are solved with quantum assistance.</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">Space networks</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10691643/">Quantum-assisted joint virtual network function deployment and maximum flow routing for space information networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Mobile Computing</em>, vol. 24, no. 2, pp. 830–844, 2025 (online 2024)</p>
+        <p class="paper__what">Jointly optimizes user association, virtual network function placement and flow routing. The resulting MILP is solved with hybrid quantum-classical Benders’ decomposition, with the master problem converted to a QUBO.</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--fl">Federated learning</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10636852/">Hybrid quantum–classical benders' decomposition for federated learning scheduling in distributed networks</a></h3>
+        <p class="paper__authors">Xinliang Wei, Lei Fan, Yuanxiong Guo, Yanmin Gong, Zhu Han, Yu Wang</p>
+        <p class="paper__venue"><em>IEEE Transactions on Network Science and Engineering</em>, vol. 11, no. 6, pp. 6038–6051, 2024</p>
+        <p class="paper__what">Schedules several federated learning models at once, choosing participants and learning rates. The joint problem is an NP-hard MINLP, which hybrid quantum-classical Benders’ decomposition solves.</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">Satellite networks</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10614917/">Quantum-assisted joint caching and power allocation for integrated satellite-terrestrial networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Network Science and Engineering</em>, vol. 11, no. 6, pp. 5163–5174, 2024</p>
+        <p class="paper__what">Maximizes throughput by jointly optimizing content delivery, cache placement and transmit power. The large-scale MINLP is solved with a hybrid quantum-classical <em>generalized</em> Benders’ decomposition.</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--fl">Federated learning</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10230094/">Quantum assisted scheduling algorithm for federated learning in distributed networks</a></h3>
+        <p class="paper__authors">Xinliang Wei, Lei Fan, Yuanxiong Guo, Yanmin Gong, Zhu Han, Yu Wang</p>
+        <p class="paper__venue"><em>32nd International Conference on Computer Communications and Networks (ICCCN)</em>, IEEE, pp. 1–10, 2023</p>
+        <p class="paper__what">The first application of the method: multi-model federated learning scheduling, split into a binary master problem and small continuous subproblems that combine quantum and classical computing.</p>
+      </li>
+    </ol>
+    <p class="small muted papers__note">Using HQC-Bend in your research? <a href="#contact">Let us know</a> and we will add your paper here.</p>
+  </div>
+</section>
+
+<!-- ============ CITE ============ -->
+<section class="section" id="cite">
+  <div class="wrap">
+    <p class="kicker">11 · Citation</p>
     <h2>Cite HQC-Bend</h2>
-    <p class="intro">If you use HQC-Bend in your work, please cite the QCNC 2025 paper:</p>
+    <p class="intro">If you use HQC-Bend in your work, please cite the <a href="https://ieeexplore.ieee.org/abstract/document/11000177/">QCNC 2025 paper</a>:</p>
     <div class="codecard"><button class="copy" type="button" aria-label="Copy BibTeX">Copy</button>
 <pre><code class="nohighlight">@inproceedings{zhao2025hqc,
   title={HQC-Bend: A Python Package of Hybrid Quantum-Classical Multi-cuts Benders' Decomposition Algorithm},
@@ -713,7 +774,7 @@ optimal found, it takes 4  Rounds.</code></pre></div>
   url={https://github.com/djzts/HQCMCBD-API}
 }</code></pre></div>
 
-    <div class="contact">
+    <div class="contact" id="contact">
       <div>
         <h3>Contact</h3>
         <p>Zhongqi Zhao · <a href="mailto:zzhao27@uh.edu">zzhao27@uh.edu</a><br>Mingze Li · <a href="mailto:mli44@central.uh.edu">mli44@central.uh.edu</a></p>
