@@ -709,8 +709,8 @@ class HQCMCBD_algorithm:
              for j in range(self.bifurcation_QUBO.shape[1])
              if self.bifurcation_QUBO[i, j] != 0.0}
 
-        # create QUBO sampler in openjij
-        sampler = oj.CSQASampler()
+        # create QUBO sampler in openjij (CSQASampler.sample_qubo rejects every call in openjij 0.12)
+        sampler = oj.SQASampler()
 
         st = time.time()
         response = sampler.sample_qubo(qubo_dict, num_reads=self.num_of_read)
@@ -719,7 +719,8 @@ class HQCMCBD_algorithm:
 
         best_sample = response.first.sample
         self.rearranged_bin_mat = np.zeros((self.mcut_num, self.num_binvars))
-        best_bin_vector = np.array([best_sample[i] for i in sorted(best_sample)])
+        # Variables whose QUBO row is all zero are not in qubo_dict; any value is optimal for them.
+        best_bin_vector = np.array([best_sample.get(i, 0) for i in range(self.bifurcation_QUBO.shape[0])])
         np.save(os.path.join(self.quantum_LP_folder, f"LP_output_OJ_MAP_{count}.npy"), best_bin_vector)
         
         # Fill x matrix
@@ -1221,6 +1222,13 @@ class HQCMCBD_algorithm:
             }
             print(f"BDD incumbent objective value is {self.bdd_incumbent['objective']}")
 
+    def add_cqm_cut(self, lhs, rhs, optimality, label):
+        """Add a cut to the CQM master: lhs @ x (+ lambda_coeff @ lambda_bits for an optimality cut) >= rhs."""
+        expr = sum(lhs[i] * self.bin_x_cqm[i] for i in range(self.num_binvars))
+        if optimality:
+            expr += sum(self.lambda_coeff[j] * self.bin_lambda_cqm[j] for j in range(self.lambda_bits))
+        self.cqm.add_constraint(expr >= rhs, label = label)
+
     def add_bdd_root_cuts(self, cuts):
         """Add the root-phase cuts to the binary master (Gurobi, QUBO or CQM)."""
         equality = ">="
@@ -1237,10 +1245,7 @@ class HQCMCBD_algorithm:
                 self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, rhs, \
                     round_num = -(k + 1), penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
             else:
-                expr = sum(lhs[i] * self.bin_x_cqm[i] for i in range(self.num_binvars))
-                if optimality:
-                    expr += sum(self.lambda_coeff[j] * self.bin_lambda_cqm[j] for j in range(self.lambda_bits))
-                self.cqm.add_constraint(expr >= rhs, label = f'CQM_BDD_root_cut_{k}')
+                self.add_cqm_cut(lhs, rhs, optimality, f'CQM_BDD_root_cut_{k}')
             self.master_constraint_dict[f"bdd-root-cut-{k}"] = [list(lhs), equality, rhs]
 
     def Add_master_constraint_gurobi(self, counter = 0, index = 0):
@@ -1278,17 +1283,24 @@ class HQCMCBD_algorithm:
                 statuscode = 2
         else:
             print("error, no such method") 
+        # openjij keeps its master as a QUBO; cqm, bqm_hybrid and bqm_quantum sample self.cqm.
         if statuscode == 5 :   # unbounded
             print("create feasibility cut")
-            QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, np.zeros(self.lambda_bits), np.zeros(len(self.qubo_slack_dict.keys()))])
-            QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
+            if self.dwave_solver == "openjij":
+                QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, np.zeros(self.lambda_bits), np.zeros(len(self.qubo_slack_dict.keys()))])
+                QUBO_next_rhs = self.MAP_next_rhs
+                self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
+            else:
+                self.add_cqm_cut(self.MAP_next_lhs, self.MAP_next_rhs, False, f'CQM_cut_round_{counter}_cut_{index}')
             self.master_constraint_dict.update({f"c-round-{counter}-cut-{index}":  [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))] , equality , self.MAP_next_rhs] })
         elif statuscode == 2: # Optimal
             print("create optimality cut")
-            QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, self.lambda_coeff, np.zeros(len(self.qubo_slack_dict.keys()))])
-            QUBO_next_rhs = self.MAP_next_rhs
-            self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
+            if self.dwave_solver == "openjij":
+                QUBO_next_lhs = np.concatenate([self.MAP_next_lhs, self.lambda_coeff, np.zeros(len(self.qubo_slack_dict.keys()))])
+                QUBO_next_rhs = self.MAP_next_rhs
+                self.bifurcation_QUBO, self.qubo_slack_dict = QUBO_Cons_selection(self.bifurcation_QUBO, QUBO_next_lhs, equality, QUBO_next_rhs, round_num = counter, penalty = DEFAULT_CUT_PENALTY, dictionary = self.qubo_slack_dict)
+            else:
+                self.add_cqm_cut(self.MAP_next_lhs, self.MAP_next_rhs, True, f'CQM_cut_round_{counter}_cut_{index}')
             self.master_constraint_dict.update({f"c-round-{counter}-cut-{index}":  [[self.MAP_next_lhs[m] for m in range(len(self.MAP_next_lhs))], [self.lambda_coeff], equality, self.MAP_next_rhs] })
                          
     def Add_master_constraint_bifurcation(self, counter = 0):

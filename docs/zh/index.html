@@ -542,7 +542,7 @@ solver.run()</code></pre>
         <div class="codecard"><button class="copy" type="button" aria-label="复制代码">复制</button>
 <pre><code class="language-bash">git clone https://github.com/djzts/HQCMCBD-API.git
 cd HQCMCBD-API
-pip install gurobipy numpy dimod dwave-system openjij torch simulated-bifurcation</code></pre></div>
+pip install gurobipy numpy dimod dwave-system "openjij~=0.12.2" torch simulated-bifurcation</code></pre></div>
         <p class="small muted">使用 D-Wave 模式（<code>cqm</code>、<code>bqm_hybrid</code>、<code>bqm_quantum</code>）时，请在环境变量中设置 <code>DWAVE_API_TOKEN</code>，不要把令牌提交到配置文件中。</p>
         <div class="gpu-note" id="gpu">
           <h4>GPU 加速的模拟分岔（<code>"bifurcation"</code>）</h4>

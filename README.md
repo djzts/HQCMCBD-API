@@ -31,7 +31,7 @@ Tutorial: [HQCMCBD overview video](https://www.youtube.com/watch?v=VcDaOj8W4MI)
 - `numpy`
 - `dimod`
 - `dwave-system`
-- Optional: `openjij` for OpenJij mode
+- Optional: `openjij` 0.12 for OpenJij mode, tested with 0.12.2 (`pip install "openjij~=0.12.2"`). The backend samples with `SQASampler`; `CSQASampler.sample_qubo` raises `ValueError: Unknown parameters detected` in openjij 0.12.
 - Optional: `torch` and `simulated-bifurcation` for simulated bifurcation mode. This mode runs on an NVIDIA GPU (`device="cuda"`); see [GPU-Accelerated Simulated Bifurcation](#gpu-accelerated-simulated-bifurcation) below.
 
 The repository currently does not include a `requirements.txt`, so install the solver packages required by the modes you plan to use.
