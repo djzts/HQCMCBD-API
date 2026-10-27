@@ -173,6 +173,19 @@ strong { font-weight: 650; }
   :root:not([data-theme="light"]) .i-moon { display: block; }
 }
 
+.langbtn { display: inline-grid; place-items: center; min-width: 36px; height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 600 13px var(--font); text-decoration: none; white-space: nowrap; }
+.langbtn:hover { color: var(--ink); border-color: var(--line-strong); }
+
+/* ---------- Chinese typography ---------- */
+html[lang^="zh"] {
+  --font: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", "WenQuanYi Zen Hei", system-ui, sans-serif;
+}
+html[lang^="zh"] h2, html[lang^="zh"] h3, html[lang^="zh"] .hero__sub { letter-spacing: 0; }
+html[lang^="zh"] h2 { max-width: 20em; }
+html[lang^="zh"] .hero__sub { max-width: 21em; }
+html[lang^="zh"] .intro, html[lang^="zh"] .lead { max-width: 40em; }
+html[lang^="zh"] .eyebrow, html[lang^="zh"] .kicker { font-family: var(--mono), var(--font); }
+
 /* ---------- buttons ---------- */
 .btn {
   display: inline-flex; align-items: center; gap: 8px;

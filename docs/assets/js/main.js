@@ -1,6 +1,38 @@
 (function () {
   "use strict";
 
+  var ZH = (document.documentElement.lang || "").toLowerCase().indexOf("zh") === 0;
+  var T = ZH ? {
+    copied: "已复制",
+    pressCopy: "请按 Ctrl+C",
+    lambda: function (lo, hi, step, n) {
+      return "λ 的取值范围为 <b>[" + lo + ", " + hi + "]</b>，步长 <b>" + step + "</b>，主问题中共使用 <b>" + n + "</b> 个二进制变量。";
+    },
+    classic: "Hybrid_mode 已关闭：主问题由 Gurobi 经典求解，量子后端设置将被忽略。",
+    local: function (mode) { return "“" + mode + "” 在本地运行，属于量子启发式求解器，不需要 D-Wave 令牌。"; },
+    placeholder: "令牌为占位值时，HQC-Bend 会从环境变量 DWAVE_API_TOKEN 读取你的 D-Wave Leap 令牌。",
+    realToken: '<span class="warn">不要提交真实令牌。</span>请勿将此文件纳入版本控制，或改用环境变量 DWAVE_API_TOKEN。'
+  } : {
+    copied: "Copied",
+    pressCopy: "Press Ctrl+C",
+    lambda: function (lo, hi, step, n) {
+      return "λ ranges over <b>[" + lo + ", " + hi + "]</b> in steps of <b>" + step +
+        "</b>, using <b>" + n + "</b> binary variables in the master problem.";
+    },
+    classic: "Hybrid_mode is off, so Gurobi solves the master problem classically and the quantum backend settings are ignored.",
+    local: function (mode) { return "“" + mode + "” runs locally as a quantum-inspired solver. No D-Wave token is needed."; },
+    placeholder: "With a placeholder token, HQC-Bend reads your D-Wave Leap token from the DWAVE_API_TOKEN environment variable.",
+    realToken: '<span class="warn">Don’t commit a real token.</span> Keep this file out of version control, or use the DWAVE_API_TOKEN environment variable instead.'
+  };
+
+  /* ---------- language switch ---------- */
+  document.querySelectorAll("[data-lang]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      try { localStorage.setItem("hqc-lang", a.getAttribute("data-lang")); } catch (e) {}
+      a.setAttribute("href", a.getAttribute("href").split("#")[0] + location.hash);
+    });
+  });
+
   /* ---------- theme toggle ---------- */
   var root = document.documentElement;
   var toggle = document.getElementById("themeToggle");
@@ -53,7 +85,7 @@
     function done(ok) {
       if (!btn) return;
       var old = btn.textContent;
-      btn.textContent = ok ? "Copied" : "Press Ctrl+C";
+      btn.textContent = ok ? T.copied : T.pressCopy;
       setTimeout(function () { btn.textContent = old; }, 1400);
     }
     if (navigator.clipboard && window.isSecureContext) {
@@ -199,22 +231,20 @@
     var hi = Math.pow(2, N) - Math.pow(2, -D);
     var lo = -(Math.pow(2, M + 1) - 2);
     var step = Math.pow(2, -D);
-    info.innerHTML =
-      "λ ranges over <b>[" + fmt(lo) + ", " + fmt(hi) + "]</b> in steps of <b>" + fmt(step) +
-      "</b>, using <b>" + (N + D + M) + "</b> binary variables in the master problem.";
+    info.innerHTML = T.lambda(fmt(lo), fmt(hi), fmt(step), N + D + M);
 
     dwaveSet.disabled = !cfg.Hybrid_mode;
     el.cutnums.disabled = !cfg.dwave.Mcut_flag;
 
     var msg = "";
     if (!cfg.Hybrid_mode) {
-      msg = "Hybrid_mode is off, so Gurobi solves the master problem classically and the quantum backend settings are ignored.";
+      msg = T.classic;
     } else if (LOCAL_MODES.indexOf(cfg.dwave.mode) !== -1) {
-      msg = "“" + cfg.dwave.mode + "” runs locally as a quantum-inspired solver. No D-Wave token is needed.";
+      msg = T.local(cfg.dwave.mode);
     } else if (PLACEHOLDER_TOKENS.indexOf(cfg.dwave.DWave_token) !== -1) {
-      msg = "With a placeholder token, HQC-Bend reads your D-Wave Leap token from the DWAVE_API_TOKEN environment variable.";
+      msg = T.placeholder;
     } else {
-      msg = '<span class="warn">Don’t commit a real token.</span> Keep this file out of version control, or use the DWAVE_API_TOKEN environment variable instead.';
+      msg = T.realToken;
     }
     note.innerHTML = msg;
   }

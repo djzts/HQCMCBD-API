@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HQC-Bend · 混合量子-经典 Benders 分解</title>
+  <meta name="description" content="HQC-Bend（HQCMCBD）：用于（混合）整数线性规划的混合量子-经典多割 Benders 分解 Python 包。IEEE QCNC 2025。">
+  <meta property="og:title" content="HQC-Bend：混合量子-经典多割 Benders 分解">
+  <meta property="og:description" content="输入一个 Gurobi 模型：二进制主问题交给量子退火器，连续子问题交给 CPU，割平面逐步缩小上下界间隙。">
+  <meta property="og:image" content="https://djzts.github.io/HQCMCBD-API/assets/img/architecture.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C8102E'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='15' text-anchor='middle' fill='white'%3EHQ%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="alternate" hreflang="en" href="https://djzts.github.io/HQCMCBD-API/">
+  <link rel="alternate" hreflang="zh-CN" href="https://djzts.github.io/HQCMCBD-API/zh/">
+
+  <script>
+    // Apply a saved theme before first paint to avoid a flash.
+    try {
+      var t = localStorage.getItem("hqc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+<a class="skip" href="#main">跳到正文</a>
+
+<nav class="topnav" aria-label="主导航">
+  <div class="wrap topnav__inner">
+    <a class="brand" href="#top"><span class="brand__mark">HQ</span><span>HQC-Bend</span></a>
+    <ul class="topnav__links">
+      <li><a href="#motivation">动机</a></li>
+      <li><a href="#how">方法</a></li>
+      <li><a href="#solvers">求解器</a></li>
+      <li><a href="#cuts">割平面</a></li>
+      <li><a href="#config">配置</a></li>
+      <li><a href="#quickstart">快速上手</a></li>
+      <li><a href="#results">结果</a></li>
+      <li><a href="#datacenter">应用</a></li>
+      <li><a href="#research">相关研究</a></li>
+      <li><a href="#cite">引用</a></li>
+    </ul>
+    <div class="topnav__actions">
+      <a class="langbtn" href="../" hreflang="en" lang="en" data-lang="en" title="Switch to English">EN</a>
+      <button class="iconbtn" id="themeToggle" type="button" aria-label="切换深色模式">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <a class="btn btn--small btn--dark" href="https://github.com/djzts/HQCMCBD-API">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap hero__grid">
+    <div class="hero__text">
+      <p class="eyebrow">IEEE QCNC 2025 · 开源 Python 包</p>
+      <h1>HQC-Bend</h1>
+      <p class="hero__sub">面向（混合）整数线性规划的混合量子-经典多割 Benders 分解算法。</p>
+      <p class="lead">输入一个 Gurobi 模型，HQC-Bend 会把<strong>二进制主问题</strong>交给量子或量子启发式退火器，把<strong>连续子问题</strong>交给经典 CPU，并不断添加最优性割和可行性割，直到上下界收敛。</p>
+      <p class="authors">
+        Zhongqi Zhao · Mingze Li · Lei Fan · Zhu Han<br>
+        <span class="muted">休斯顿大学 电子与计算机工程系</span>
+      </p>
+      <div class="cta">
+        <a class="btn btn--primary" href="#quickstart">快速上手</a>
+        <a class="btn" href="https://github.com/djzts/HQCMCBD-API">源代码</a>
+        <a class="btn" href="https://ieeexplore.ieee.org/abstract/document/11000177/">论文</a>
+        <a class="btn" href="https://www.youtube.com/watch?v=VcDaOj8W4MI">视频教程</a>
+        <a class="btn" href="#cite">引用</a>
+      </div>
+    </div>
+
+    <div class="hero__code">
+      <div class="codecard">
+        <div class="codecard__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="codecard__name">solve.py</span></div>
+<pre><code class="language-python">import gurobipy as gp
+from HQCMCBD import HQCMCBD_algorithm
+
+model = gp.Model("MILP")
+# ... 变量、约束、目标函数 ...
+
+solver = HQCMCBD_algorithm(model, mode="default")
+solver.run()</code></pre>
+      </div>
+      <p class="caption">建好模型后只需两行代码，即可全自动完成混合量子-经典求解。</p>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <ul class="stats" aria-label="概览">
+      <li><span class="stats__n">6</span><span class="stats__l">种主问题求解后端，从 Gurobi 到 D-Wave QPU</span></li>
+      <li><span class="stats__n">2</span><span class="stats__l">种加割方案：normal 与 L-shaped</span></li>
+      <li><span class="stats__n">1</span><span class="stats__l">个 JSON 文件即可设定求解器、割平面、精度和停止准则</span></li>
+      <li><span class="stats__n">MIT</span><span class="stats__l">许可证；可作为 Python 脚本或在 Jupyter 中运行</span></li>
+    </ul>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ MOTIVATION ============ -->
+<section class="section" id="motivation">
+  <div class="wrap">
+    <p class="kicker">01 · 研究动机</p>
+    <h2>（混合）整数线性规划无处不在，而且很难求解</h2>
+
+    <div class="grid-2 gap-lg">
+      <div>
+        <p>很多规划和运营问题同时包含<strong>是/否决策</strong>（是否开通一条线路、启动一台发电机、打开一台冷水机组）和<strong>连续量</strong>（流量、功率、温度）。这类问题就是（混合）整数线性规划，即 (M)ILP。</p>
+        <ul class="iconlist">
+          <li>
+            <span class="iconlist__ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="12" cy="4" r="2"/><path d="M7 6.5 17 11.5M7 17.5l10-5M6.5 7.5 11 5"/></svg></span>
+            <div><strong>网络问题</strong><span>在工厂、仓库和零售商之间平衡生产与需求。</span></div>
+          </li>
+          <li>
+            <span class="iconlist__ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg></span>
+            <div><strong>路径规划</strong><span>选择车辆路线，降低运输成本和里程。</span></div>
+          </li>
+          <li>
+            <span class="iconlist__ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="6" rx="1.5"/><rect x="4" y="11" width="16" height="6" rx="1.5"/><path d="M8 6h.01M8 14h.01M12 21h0M8 21h8"/></svg></span>
+            <div><strong>数据中心能源管理</strong><span>在温度约束下调度电池、冷水机组和冷却塔。</span></div>
+          </li>
+          <li>
+            <span class="iconlist__ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+            <div><strong>机组组合</strong><span>决定每个时段由哪些发电机组运行。</span></div>
+          </li>
+        </ul>
+        <div class="callout">
+          <span class="callout__n">~10%</span>
+          <span class="callout__l">McKinsey 预测：到 2030 年，美国数据中心电力需求的年增长率。这类能源问题需要更快的求解器。</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h3>为什么难</h3>
+          <div class="math-block" data-tex="\begin{aligned} \max_{\mathbf{x},\mathbf{y}}\ & \mathbf{c}^{\intercal}\mathbf{x} + \mathbf{h}^{\intercal}\mathbf{y} \\ \text{s.t. }\ & \mathbf{T}\mathbf{x} \leqq \mathbf{p} \\ & \mathbf{A}\mathbf{x} + \mathbf{G}\mathbf{y} \leqq \mathbf{b} \\ & \mathbf{x} \in \mathbb{Z}^{n},\ \mathbf{y} \in \mathbb{R}^{m} \end{aligned}"></div>
+          <p>(M)ILP 是 <strong>NP-hard</strong> 问题：除非 P = NP，否则不存在能在多项式时间内求解所有实例的算法。</p>
+          <ol class="ladder" aria-label="复杂度类别，由简单到复杂">
+            <li><span class="ladder__c">P</span><span>图连通性</span></li>
+            <li><span class="ladder__c">NP</span><span>整数分解</span></li>
+            <li><span class="ladder__c">NP-complete</span><span>图三着色</span></li>
+            <li class="is-hot"><span class="ladder__c">NP-hard</span><span>(M)ILP、停机问题</span></li>
+          </ol>
+          <p class="muted small">经典方法包括枚举法、分支定界法和割平面法，它们都运行在 CPU 上。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUANTUM VS CLASSICAL ============ -->
+<section class="section section--alt" id="quantum">
+  <div class="wrap">
+    <p class="kicker">02 · 量子与经典</p>
+    <h2>CPU？QPU？两者并用。</h2>
+    <p class="intro">两种处理器各有所长、各有所短。HQC-Bend 把问题中适合各自的部分分别交给它们。</p>
+
+    <div class="tablewrap">
+      <table class="compare">
+        <thead>
+          <tr><th scope="col"></th><th scope="col">优势</th><th scope="col">劣势</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><span class="chip chip--cpu">CPU</span> 中央处理器</th>
+            <td><ul><li>通用性强</li><li>运行经典算法效率高</li></ul></td>
+            <td><ul><li>并行能力有限</li><li>某些任务上速度较慢</li></ul></td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="chip chip--qpu">QPU</span> 量子处理器</th>
+            <td><ul><li>量子并行</li><li>量子隧穿，可跳出局部极小值</li><li>部分问题上可实现指数级加速*</li></ul></td>
+            <td><ul><li>仅适用于特定问题</li><li>处于 NISQ（含噪声中等规模量子）时代，错误率较高</li></ul></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-3 steps3">
+      <div class="step"><span class="step__n">1</span><h3>展开叠加</h3><p>叠加态同时覆盖巨大的候选解空间。</p></div>
+      <div class="step"><span class="step__n">2</span><h3>编码问题</h3><p>把优化问题嵌入量子系统的能量景观中。</p></div>
+      <div class="step"><span class="step__n">3</span><h3>释放算力</h3><p>系统演化到低能量状态，读出后即为经典解。</p></div>
+    </div>
+
+    <div class="split-note">
+      <div class="split-note__item"><span class="chip chip--qpu">QPU</span><p><strong>主问题</strong>是纯二进制问题，正是退火器原生求解的形式（QUBO）。</p></div>
+      <div class="split-note__item"><span class="chip chip--cpu">CPU</span><p><strong>子问题</strong>是连续线性规划，经典求解器可以快速并行地处理。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section" id="how">
+  <div class="wrap">
+    <p class="kicker">03 · 工作原理</p>
+    <h2>一个类，三个阶段，一个循环</h2>
+    <p class="intro">HQC-Bend 把目标模型分解为二进制主问题（MAP）和连续子问题（SUB），并在两者之间迭代。</p>
+
+    <figure class="figure figure--wide">
+      <img src="../assets/img/architecture.png" width="1800" height="919" loading="lazy" alt="HQC-Bend 算法架构：目标 Gurobi 模型先经过预处理（1）；主问题在 CPU 或 QPU 上用 Hybrid BQM、Direct BQM 或 CQM 求解（2）；若阈值检查未通过，二进制解被送到在 CPU 1 至 N 上以 normal 或 L-shaped 方案求解的子问题（3），子问题向主问题返回最优性割和可行性割。检查通过后输出最优解 [x; y]。">
+      <figcaption>算法类的逻辑流程，各编号阶段的说明见下文。</figcaption>
+    </figure>
+
+    <div class="grid-3 stages">
+      <article class="stage">
+        <span class="stage__n">1</span>
+        <h3>预处理</h3>
+        <p>读取你的 <code>gurobipy</code> 模型，区分二进制变量 <span class="m">\mathbf{x}</span> 和连续变量 <span class="m">\mathbf{y}</span>，并提取各矩阵。</p>
+        <p class="small muted"><span class="m">\mathbf{c},\mathbf{H},\mathbf{e}</span> 进入 MAP，<span class="m">\mathbf{d},\mathbf{A},\mathbf{G},\mathbf{b}</span> 进入 SUB。</p>
+      </article>
+      <article class="stage">
+        <span class="stage__n">2</span>
+        <h3>主问题</h3>
+        <p>在 CPU（Gurobi）、QPU（D-Wave CQM/BQM）或本地量子启发式采样器上求解，返回一个或多个二进制候选解 <span class="m">\mathbf{x}^{*}</span>。</p>
+        <p class="small muted">根据 λ 上下界的阈值检查决定是否停止。</p>
+      </article>
+      <article class="stage">
+        <span class="stage__n">3</span>
+        <h3>子问题与割平面</h3>
+        <p>对每个候选解，子问题在 CPU 1…N 上以 <em>normal</em> 或 <em>L-shaped</em> 方案求解，并向 MAP 返回最优性割或可行性割。</p>
+        <p class="small muted">循环持续进行，直到间隙收敛或达到 <code>max_steps</code>。</p>
+      </article>
+    </div>
+
+    <div class="grid-2 gap-lg formulas">
+      <div class="panel">
+        <h3>目标模型</h3>
+        <div class="math-block" data-tex="\begin{aligned} \min\ & \mathbf{c}^{\intercal}\mathbf{x} + \mathbf{d}^{\intercal}\mathbf{y} \\ \text{s.t. }\ & \mathbf{A}\mathbf{x} + \mathbf{G}\mathbf{y} \leqq \mathbf{b}, \\ & \mathbf{H}\mathbf{x} \leqq \mathbf{e}, \\ & \mathbf{x} \in \mathbb{B}^{n},\ \mathbf{y} \in \mathbb{R}^{m}. \end{aligned}"></div>
+      </div>
+      <div class="panel">
+        <h3>主问题（MAP）</h3>
+        <div class="math-block" data-tex="\begin{aligned} \min_{\mathbf{x},\lambda,\mathbf{z}}\ & \mathbf{c}^{\intercal}\mathbf{x} + \lambda \\ \text{s.t. }\ & \mathbf{H}\mathbf{x} \leqq \mathbf{e}, \\ & f(\lambda,\mathbf{x}) \le 0 \quad \text{（最优性割）}, \\ & f(\mathbf{x}) \le 0 \quad \text{（可行性割）}, \\ & \lambda = g(\mathbf{z}) \quad \text{（离散化）}, \\ & \mathbf{x} \in \mathbb{B}^{n},\ \lambda \in \mathbb{Q},\ \mathbf{z} \in \mathbb{B}^{l}. \end{aligned}"></div>
+      </div>
+    </div>
+
+    <h3 class="subhead">主要特点</h3>
+    <ul class="features">
+      <li><strong>混合量子-经典计算。</strong>QPU 求解二进制主问题，CPU 求解连续子问题。</li>
+      <li><strong>模块化结构。</strong>预处理、主问题求解器和加割方案相互独立，便于扩展。</li>
+      <li><strong>原生支持 Gurobi 和 Python。</strong>输入就是普通的 <code>gurobipy</code> 模型，可作为脚本运行，也可在 Jupyter Notebook 中运行。</li>
+      <li><strong>子问题并行。</strong>多个二进制候选解在 CPU 集群上同时评估。</li>
+      <li><strong>多种量子后端。</strong>支持 D-Wave BQM 和 CQM 求解器，以及 OpenJij 和模拟分岔采样器。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ SOLVERS ============ -->
+<section class="section section--alt" id="solvers">
+  <div class="wrap">
+    <p class="kicker">04 · 主问题求解器</p>
+    <h2>从二进制主问题到 QUBO</h2>
+    <p class="intro">由于 λ 被离散为若干二进制位（见<a href="#config">配置</a>），主问题是纯二进制的。各量子模式把目标函数和约束编码为 QUBO，每个约束作为惩罚项加入：</p>
+    <div class="math-block math-block--center" data-tex="f(\mathbf{x}) \;\longrightarrow\; \text{QUBO} \;=\; \text{QUBO}_{\text{obj}} \;+\; \sum_{c \,\in\, \text{约束}} P_c \cdot g(\text{约束}_c)"></div>
+    <p class="small muted center">其中 <span class="m">P_c</span> 是约束 <span class="m">c</span> 的惩罚系数，<span class="m">g(\cdot)</span> 是该约束编码后的惩罚项。</p>
+
+    <div class="backends">
+      <article class="backend">
+        <header><span class="chip chip--cpu">CPU</span><code>Hybrid_mode: false</code></header>
+        <h3>Gurobi</h3>
+        <p>经典基准。用 Gurobi 精确求解 MAP，每次迭代添加一个割。</p>
+      </article>
+      <article class="backend">
+        <header><span class="chip chip--hyb">CPU + QPU</span><code>"cqm"</code></header>
+        <h3>约束二次模型（CQM）</h3>
+        <p>D-Wave Leap 混合 CQM 求解器。约束以原生形式传入，而不是转成惩罚项。</p>
+      </article>
+      <article class="backend">
+        <header><span class="chip chip--hyb">CPU + QPU</span><code>"bqm_hybrid"</code></header>
+        <h3>混合 BQM</h3>
+        <p>D-Wave Leap 混合采样器，经典模块与量子模块协同工作，性能均衡。</p>
+      </article>
+      <article class="backend">
+        <header><span class="chip chip--qpu">QPU</span><code>"bqm_quantum"</code></header>
+        <h3>直接 BQM</h3>
+        <p>通过嵌入组合器（embedding composite）在 D-Wave QPU 上进行纯量子退火。</p>
+      </article>
+      <article class="backend">
+        <header><span class="chip chip--sim">本地</span><code>"openjij"</code></header>
+        <h3>OpenJij</h3>
+        <p>在本机运行的量子启发式退火，无需云端令牌。</p>
+      </article>
+      <article class="backend">
+        <header><span class="chip chip--sim">本地</span><code>"bifurcation"</code></header>
+        <h3>模拟分岔</h3>
+        <p>基于 PyTorch 的 GPU/CPU 量子启发式 Ising 求解器。</p>
+      </article>
+    </div>
+
+    <div class="grid-2 gap-lg hss">
+      <div>
+        <h3>D-Wave 混合求解服务的内部结构</h3>
+        <p>混合模式运行在 D-Wave 的混合求解服务（Hybrid Solver Service）上。它把<strong>经典启发式模块（CH）</strong>与<strong>量子模块（QM）</strong>组合成多个并行线程，共同返回一个或多个高质量候选解。HQC-Bend 可以把每个候选解各自转化为一个割（多割）。</p>
+        <p class="small muted">示意图参考 Osaba, Villar-Rodríguez, Gomez-Tejedor and Oregi, “Hybrid quantum solvers in production: how to succeed in the NISQ era?”, IDEAL 2024, pp. 423–434。</p>
+      </div>
+      <div class="hss__diagram" aria-label="示意图：BQM 和 CQM 输入进入三个并行的 CH-QM 线程，生成候选解">
+        <svg viewBox="0 0 420 210" role="img" aria-labelledby="hssTitle">
+          <title id="hssTitle">经典启发式模块（CH）与量子模块（QM）组成的三个并行线程生成候选解</title>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" class="svg-arrowhead"/></marker></defs>
+          <g class="svg-node"><rect x="8" y="58" width="62" height="34" rx="8"/><text x="39" y="80">BQM</text></g>
+          <g class="svg-node"><rect x="8" y="120" width="62" height="34" rx="8"/><text x="39" y="142">CQM</text></g>
+          <g class="svg-line"><path d="M70 75 C 100 75, 100 37, 128 37" marker-end="url(#ah)"/><path d="M70 75 C 100 75, 100 105, 128 105" marker-end="url(#ah)"/><path d="M70 137 C 100 137, 100 173, 128 173" marker-end="url(#ah)"/><path d="M70 137 C 100 137, 100 105, 128 105" marker-end="url(#ah)"/></g>
+          <g class="svg-ch"><rect x="130" y="20" width="62" height="34" rx="8"/><text x="161" y="42">CH</text><rect x="130" y="88" width="62" height="34" rx="8"/><text x="161" y="110">CH</text><rect x="130" y="156" width="62" height="34" rx="8"/><text x="161" y="178">CH</text></g>
+          <g class="svg-line"><path d="M192 37h30" marker-end="url(#ah)"/><path d="M192 105h30" marker-end="url(#ah)"/><path d="M192 173h30" marker-end="url(#ah)"/></g>
+          <g class="svg-qm"><rect x="224" y="20" width="62" height="34" rx="8"/><text x="255" y="42">QM</text><rect x="224" y="88" width="62" height="34" rx="8"/><text x="255" y="110">QM</text><rect x="224" y="156" width="62" height="34" rx="8"/><text x="255" y="178">QM</text></g>
+          <g class="svg-line"><path d="M286 37 C 320 37, 320 100, 336 103" marker-end="url(#ah)"/><path d="M286 105h48" marker-end="url(#ah)"/><path d="M286 173 C 320 173, 320 110, 336 107" marker-end="url(#ah)"/></g>
+          <g class="svg-out"><rect x="338" y="86" width="76" height="38" rx="19"/><text x="376" y="110">候选解</text></g>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CUTS ============ -->
+<section class="section" id="cuts">
+  <div class="wrap">
+    <p class="kicker">05 · 加割方案</p>
+    <h2>Normal 与 L-shaped：两种加割方式</h2>
+    <p class="intro">对于 MAP 给出的二进制候选解 <span class="m">\mathbf{x}^{*}</span>，子问题会产生对偶解 <span class="m">\mathbf{w}^{*}</span>，并据此生成以下两种割之一：</p>
+
+    <div class="cutpair">
+      <div class="cutpair__item"><span class="tag tag--opt">最优性割</span><div class="math-inline-lg" data-tex="(\mathbf{b} - \mathbf{A}\mathbf{x})^{\intercal}\mathbf{w}^{*} \le \lambda"></div></div>
+      <div class="cutpair__item"><span class="tag tag--feas">可行性割</span><div class="math-inline-lg" data-tex="(\mathbf{b} - \mathbf{A}\mathbf{x})^{\intercal}\mathbf{w}^{*} \le 0"></div></div>
+    </div>
+
+    <div class="tabs" data-tabs>
+      <div class="tabs__list" role="tablist" aria-label="加割方案">
+        <button role="tab" id="tab-normal" aria-controls="panel-normal" aria-selected="true">1. 常规方案 <code>"normal"</code></button>
+        <button role="tab" id="tab-lshape" aria-controls="panel-lshape" aria-selected="false" tabindex="-1">2. L 形方案 <code>"l_shape"</code></button>
+      </div>
+
+      <div class="tabs__panel" role="tabpanel" id="panel-normal" aria-labelledby="tab-normal">
+        <div class="grid-2 gap-lg">
+          <div class="panel">
+            <h3>原始子问题（PSUB）</h3>
+            <div class="math-block" data-tex="\begin{aligned} \lambda = \min_{\mathbf{y}}\ & \mathbf{d}^{\intercal}\mathbf{y} \\ \text{s.t. }\ & \mathbf{G}_1\mathbf{y} = \mathbf{b}_1 - \mathbf{A}_1\mathbf{x}^{*} \quad (1) \\ & \mathbf{G}_2\mathbf{y} \ge \mathbf{b}_2 - \mathbf{A}_2\mathbf{x}^{*} \quad (2) \\ & \mathbf{y} \ge \mathbf{0} \end{aligned}"></div>
+          </div>
+          <div class="panel">
+            <h3>对偶子问题（DSUB）</h3>
+            <div class="math-block" data-tex="\begin{aligned} \max_{\mathbf{w}}\ & \left(\begin{bmatrix}\mathbf{b}_1\\ \mathbf{b}_2\end{bmatrix} - \begin{bmatrix}\mathbf{A}_1\\ \mathbf{A}_2\end{bmatrix}\mathbf{x}^{*}\right)^{\intercal} \begin{bmatrix}\mathbf{w}_{(1)}\\ \mathbf{w}_{(2)}\end{bmatrix} \\ \text{s.t. }\ & \begin{bmatrix}\mathbf{G}_1\\ \mathbf{G}_2\end{bmatrix}^{\intercal} \begin{bmatrix}\mathbf{w}_{(1)}\\ \mathbf{w}_{(2)}\end{bmatrix} \le \mathbf{d} \\ & \mathbf{w}_{(1)} \in \mathbb{R},\ \mathbf{w}_{(2)} \in \mathbb{R}^{+} \end{aligned}"></div>
+          </div>
+        </div>
+        <ol class="flow">
+          <li>在当前 <span class="m">\mathbf{x}^{*}</span> 下求解对偶子问题 DSUB。</li>
+          <li>若 DSUB 有最优解 <span class="m">\mathbf{w}^{*}</span>，添加一条<span class="tag tag--opt">最优性割</span>。</li>
+          <li>否则说明在该 <span class="m">\mathbf{x}^{*}</span> 下子问题不可行：添加一条<span class="tag tag--feas">可行性割</span>。</li>
+        </ol>
+      </div>
+
+      <div class="tabs__panel" role="tabpanel" id="panel-lshape" aria-labelledby="tab-lshape" hidden>
+        <div class="grid-2 gap-lg">
+          <div class="panel">
+            <h3>L 形子问题（LSUB）</h3>
+            <div class="math-block" data-tex="\begin{aligned} \min_{\mathbf{y},\mathbf{u},\mathbf{v},\mathbf{r}}\ & \mathbf{1}^{\intercal}\mathbf{u} + \mathbf{1}^{\intercal}\mathbf{v} + \mathbf{1}^{\intercal}\mathbf{r} \\ \text{s.t. }\ & \mathbf{G}_1\mathbf{y} + \mathbf{u} - \mathbf{v} = \mathbf{b}_1 - \mathbf{A}_1\mathbf{x}^{*} \quad (3) \\ & \mathbf{G}_2\mathbf{y} + \mathbf{r} \ge \mathbf{b}_2 - \mathbf{A}_2\mathbf{x}^{*} \quad (4) \\ & \mathbf{y},\ \mathbf{u},\ \mathbf{v},\ \mathbf{r} \ge \mathbf{0} \end{aligned}"></div>
+          </div>
+          <div class="panel">
+            <h3>LSUB 的对偶问题（DLSUB）</h3>
+            <div class="math-block" data-tex="\begin{aligned} \max_{\mathbf{w}}\ & \left(\begin{bmatrix}\mathbf{b}_1\\ \mathbf{b}_2\end{bmatrix} - \begin{bmatrix}\mathbf{A}_1\\ \mathbf{A}_2\end{bmatrix}\mathbf{x}^{*}\right)^{\intercal} \begin{bmatrix}\mathbf{w}_{(3)}\\ \mathbf{w}_{(4)}\end{bmatrix} \\ \text{s.t. }\ & \mathbf{G}_1^{\intercal}\mathbf{w}_{(3)} + \mathbf{G}_2^{\intercal}\mathbf{w}_{(4)} \le \mathbf{0} \\ & -\mathbf{1} \le \mathbf{w}_{(3)} \le \mathbf{1},\quad \mathbf{w}_{(4)} \le \mathbf{1} \\ & \mathbf{w}_{(3)} \in \mathbb{R},\ \mathbf{w}_{(4)} \in \mathbb{R}^{+} \end{aligned}"></div>
+          </div>
+        </div>
+        <ol class="flow">
+          <li>求解 LSUB。人工变量 <span class="m">\mathbf{u},\mathbf{v},\mathbf{r}</span> 衡量 <span class="m">\mathbf{x}^{*}</span> 偏离可行域的程度。</li>
+          <li>若目标值 <strong>&gt; 0</strong>，说明 <span class="m">\mathbf{x}^{*}</span> 不可行：由 DLSUB 得到 <span class="m">\mathbf{w}^{*}</span>，添加一条<span class="tag tag--feas">可行性割</span>。</li>
+          <li>若目标值 <strong>= 0</strong>，求解对偶子问题并添加一条<span class="tag tag--opt">最优性割</span>。</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="grid-2 gap-lg multicut">
+      <div>
+        <h3>多割</h3>
+        <p>量子采样器返回的不只是一个解，而是一整个低能量二进制状态的分布。设置 <code>Mcut_flag: true</code> 后，HQC-Bend 取最好的 <code>Cutnums</code> 个候选解，在 CPU 上并行求解它们的子问题，并在一次迭代中为每个候选解各添加一个割。每轮添加的割越多，λ 的上下界收紧得越快。</p>
+        <p>每个割都是一个从下方约束 λ 的平面。迭代持续进行，直到 λ 的上下界之差小于 <code>threshold.gap</code>。</p>
+      </div>
+      <figure class="figure">
+        <img src="../assets/img/benders-rounds.png" width="1400" height="662" loading="lazy" alt="左：二进制变量 x1、x2 上从下方约束 t 的割平面三维图。右：t 的上界在前三轮保持 28，随后降到 17；下界从 11 升到 17，两者在第 4 轮相遇。">
+        <figcaption>Benders 分解第四轮。左：累计的割平面；右：λ（图中记为 t）的上下界在第 4 轮相遇。</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONFIG ============ -->
+<section class="section section--alt" id="config">
+  <div class="wrap">
+    <p class="kicker">06 · 配置</p>
+    <h2>改方法，不改代码</h2>
+    <p class="intro">一个 JSON 文件控制求解后端、加割方案、λ 的精度和停止准则。<code>mode="manual"</code> 读取 <a href="https://github.com/djzts/HQCMCBD-API/blob/main/config.json"><code>config.json</code></a>，<code>mode="default"</code> 读取 <a href="https://github.com/djzts/HQCMCBD-API/blob/main/config_default.json"><code>config_default.json</code></a>。即使对这一领域了解不多，用户也能自由切换数学方法。</p>
+
+    <div class="builder" id="builder">
+      <form class="builder__form" id="cfgForm" autocomplete="off">
+        <fieldset>
+          <legend>连接变量 λ</legend>
+          <div class="field3">
+            <label>非负整数位数 <input type="number" name="nonneg" min="1" max="40" value="15"></label>
+            <label>小数位数 <input type="number" name="decimal" min="1" max="20" value="4"></label>
+            <label>负整数位数 <input type="number" name="negative" min="1" max="40" value="15"></label>
+          </div>
+          <div class="lambda-info" id="lambdaInfo" aria-live="polite"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>算法</legend>
+          <div class="field2">
+            <label>子问题方法
+              <select name="submethod"><option value="l_shape">l_shape</option><option value="normal">normal</option></select>
+            </label>
+            <label>最大迭代次数 <input type="number" name="max_steps" min="1" max="10000" value="20"></label>
+            <label>停止准则
+              <select name="ttype"><option value="absolute">absolute</option><option value="relative">relative</option></select>
+            </label>
+            <label>间隙阈值 <input type="number" name="gap" min="0.0001" step="any" value="0.5"></label>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" name="hybrid" checked><span>Hybrid_mode（用量子方法求解主问题）</span></label>
+            <label class="switch"><input type="checkbox" name="debug"><span>debug_mode（导出 LP 文件）</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset id="dwaveSet">
+          <legend>量子后端</legend>
+          <div class="field2">
+            <label>模式
+              <select name="dmode">
+                <option value="cqm">cqm</option>
+                <option value="bqm_hybrid">bqm_hybrid</option>
+                <option value="bqm_quantum">bqm_quantum</option>
+                <option value="openjij">openjij</option>
+                <option value="bifurcation">bifurcation</option>
+              </select>
+            </label>
+            <label>num_of_read <input type="number" name="reads" min="1" max="100000" value="100"></label>
+            <label>Cutnums <input type="number" name="cutnums" min="1" max="100" value="2"></label>
+            <label>DWave_token <input type="text" name="token" value="YOUR_DWAVE_TOKEN" spellcheck="false"></label>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" name="mcut" checked><span>Mcut_flag（每次迭代添加多个割）</span></label>
+          </div>
+        </fieldset>
+        <p class="builder__note" id="cfgNote" aria-live="polite"></p>
+      </form>
+
+      <div class="builder__out">
+        <div class="codecard codecard--json">
+          <div class="codecard__bar">
+            <span class="codecard__name" id="cfgFile">config.json</span>
+            <span class="codecard__actions">
+              <button type="button" class="linkbtn" id="cfgDefault">载入默认</button>
+              <button type="button" class="linkbtn" id="cfgCopy">复制</button>
+              <button type="button" class="linkbtn" id="cfgDownload">下载</button>
+            </span>
+          </div>
+          <pre><code id="cfgJson" class="language-json"></code></pre>
+        </div>
+        <p class="caption">将其保存为 <code>config.json</code>，放在 <code>HQCMCBD.py</code> 所在目录，并以 <code>mode="manual"</code> 运行。</p>
+      </div>
+    </div>
+
+    <details class="details">
+      <summary>全部配置项</summary>
+      <div class="tablewrap">
+        <table class="kw">
+          <thead><tr><th scope="col">配置项</th><th scope="col">含义</th><th scope="col">取值</th></tr></thead>
+          <tbody>
+            <tr><td><code>lambda_var</code></td><td>连接 MAP 与 SUB 的变量 λ，表示为 <span class="m">\lambda = \lambda_{+}^{\mathbb{Z}} + \lambda_{+}^{\mathbb{Q}\setminus\mathbb{Z}} - \lambda_{-}^{\mathbb{Z}}</span></td><td>对象</td></tr>
+            <tr><td><code>nonneg_bits_length</code></td><td>非负整数部分的位数 <span class="m">\lambda_{+}^{\mathbb{Z}}</span></td><td>正整数</td></tr>
+            <tr><td><code>decimal_bits_length</code></td><td>正小数部分的位数 <span class="m">\lambda_{+}^{\mathbb{Q}\setminus\mathbb{Z}}</span></td><td>正整数</td></tr>
+            <tr><td><code>negative_bits_length</code></td><td>负整数部分的位数 <span class="m">\lambda_{-}^{\mathbb{Z}}</span></td><td>正整数</td></tr>
+            <tr><td><code>submethod</code></td><td>子问题的求解方法</td><td><code>normal</code>, <code>l_shape</code></td></tr>
+            <tr><td><code>debug_mode</code></td><td>导出主问题和子问题的 LP 文件</td><td><code>true</code>, <code>false</code></td></tr>
+            <tr><td><code>Hybrid_mode</code></td><td>用量子或量子启发式后端求解主问题（Q+C），而不是用 Gurobi（C+C）</td><td><code>true</code>, <code>false</code></td></tr>
+            <tr><td><code>dwave.mode</code></td><td>MAP 交给量子求解器时的编码方式</td><td><code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>, <code>openjij</code>, <code>bifurcation</code></td></tr>
+            <tr><td><code>dwave.DWave_token</code></td><td>D-Wave Leap API 令牌。若为占位值，则改为读取环境变量 <code>DWAVE_API_TOKEN</code></td><td>字符串</td></tr>
+            <tr><td><code>dwave.Mcut_flag</code></td><td>每次迭代添加多个割（否则只加一个）</td><td><code>true</code>, <code>false</code></td></tr>
+            <tr><td><code>dwave.Cutnums</code></td><td><code>Mcut_flag</code> 为 true 时每次迭代添加的割数</td><td>正整数</td></tr>
+            <tr><td><code>dwave.num_of_read</code></td><td>从量子求解器读取的样本数</td><td>正整数</td></tr>
+            <tr><td><code>threshold.type</code></td><td>停止准则检查的间隙：绝对间隙 <span class="m">|\bar\lambda - \underline\lambda|</span> 或相对间隙 <span class="m">100\cdot|\bar\lambda - \underline\lambda| / |\bar\lambda|</span>（百分比）</td><td><code>absolute</code>, <code>relative</code></td></tr>
+            <tr><td><code>threshold.gap</code></td><td>所选间隙低于该值 ε 时停止运行</td><td>正数</td></tr>
+            <tr><td><code>max_steps</code></td><td>迭代达到该次数后算法停止</td><td>正整数</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ QUICK START ============ -->
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <p class="kicker">07 · 快速上手</p>
+    <h2>从 Gurobi 模型到混合求解</h2>
+
+    <ol class="qs">
+      <li class="qs__step">
+        <div class="qs__head"><span class="qs__n">1</span><h3>安装</h3></div>
+        <p>需要 Python 3.8+ 以及带有效许可证的 Gurobi 9.1.2+。<code>HQCMCBD.py</code> 在加载时会导入所有后端，因此即使只用一种模式，也需要全部安装。</p>
+        <div class="codecard"><button class="copy" type="button" aria-label="复制代码">复制</button>
+<pre><code class="language-bash">git clone https://github.com/djzts/HQCMCBD-API.git
+cd HQCMCBD-API
+pip install gurobipy numpy dimod dwave-system openjij torch simulated-bifurcation</code></pre></div>
+        <p class="small muted">使用 D-Wave 模式（<code>cqm</code>、<code>bqm_hybrid</code>、<code>bqm_quantum</code>）时，请在环境变量中设置 <code>DWAVE_API_TOKEN</code>，不要把令牌提交到配置文件中。</p>
+      </li>
+
+      <li class="qs__step">
+        <div class="qs__head"><span class="qs__n">2</span><h3>导入</h3></div>
+        <div class="grid-2">
+          <div class="codecard"><div class="codecard__bar"><span class="codecard__name">Python 脚本</span></div>
+<pre><code class="language-python">from HQCMCBD import HQCMCBD_algorithm</code></pre></div>
+          <div class="codecard"><div class="codecard__bar"><span class="codecard__name">Jupyter Notebook</span></div>
+<pre><code class="language-python">import warnings
+warnings.filterwarnings("ignore")
+%run HQCMCBD_notebook.ipynb</code></pre></div>
+        </div>
+      </li>
+
+      <li class="qs__step">
+        <div class="qs__head"><span class="qs__n">3</span><h3>构建模型</h3></div>
+        <p>任何包含二进制变量和非负连续变量的 <code>gurobipy</code> 模型都可以。下面是包中的示例问题（<a href="https://github.com/djzts/HQCMCBD-API/blob/main/Example.ipynb"><code>Example.ipynb</code></a>）。</p>
+        <div class="codecard"><button class="copy" type="button" aria-label="复制代码">复制</button>
+<pre><code class="language-python">import gurobipy as gp
+from gurobipy import GRB
+import numpy as np
+
+A = np.array([[0, 0], [0, 0], [0, 0], [0, 0],
+              [-1, -1], [-1, 0], [-1, 0], [0, -1], [0, -1]])
+G = np.array([[1, 0, 1, 0], [1, 0, 0, 1], [0, 1, 1, 0], [0, 1, 0, 1],
+              [0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+b = np.array([1, 1, 1, 1, -1, 0, 0, 0, 0])
+c = np.hstack(np.array([-15.0, -10.0]))
+h = np.hstack(np.array([8, 9, 5, 6]))
+
+# 创建 Gurobi 模型
+model = gp.Model("MILP")
+
+# 添加变量
+x = model.addMVar(shape=len(c), vtype=GRB.BINARY, name="x")
+y = model.addMVar(shape=len(h), vtype=GRB.CONTINUOUS, lb=0, name="y")
+z = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name="z")
+p = model.addVar(vtype=GRB.BINARY, name="p")
+
+# 目标函数与约束
+model.setObjective(c @ x + h @ y, GRB.MAXIMIZE)
+model.addConstr(A @ x + G @ y &lt;= b, name="constraints")
+model.addConstr(z == 1, name="constraints_eq")
+model.addConstr(p == 1, name="constraints_eq2")
+
+model.optimize()</code></pre></div>
+        <p class="small muted">最大化模型会在内部转换为最小化问题，结果仍按原始符号约定输出。</p>
+      </li>
+
+      <li class="qs__step">
+        <div class="qs__head"><span class="qs__n">4</span><h3>运行（只需两行）</h3></div>
+        <div class="grid-2">
+          <div class="codecard"><div class="codecard__bar"><span class="codecard__name">自定义方法 · config.json</span></div>
+<pre><code class="language-python">solver = HQCMCBD_algorithm(model, mode="manual")
+solver.run()</code></pre></div>
+          <div class="codecard"><div class="codecard__bar"><span class="codecard__name">默认设置 · config_default.json</span></div>
+<pre><code class="language-python">solver = HQCMCBD_algorithm(model, mode="default")
+solver.run()</code></pre></div>
+        </div>
+      </li>
+
+      <li class="qs__step">
+        <div class="qs__head"><span class="qs__n">5</span><h3>查看收敛过程</h3></div>
+        <p>每一轮都会输出目标值、λ 的上下界以及相对和绝对间隙。间隙达到阈值时停止运行。</p>
+        <div class="codecard codecard--log"><div class="codecard__bar"><span class="codecard__name">输出 · Example-3bin-output.ipynb，manual 模式（节选）</span></div>
+<pre><code class="nohighlight">Benders decomposition Round - 2
+The 2-th Config file of quantum sampling is created successfully at .\data_output\Gurobi_info-round-2.json.
+create optimality cut
+Round 2:
+    Current Objective value is 12.0;
+    lambda_upper is 20.0;
+    lambda_lower is 11.0;
+    Relative gap is 81.818%.
+    Absolute gap is 9.0
+Benders decomposition Round - 3
+create optimality cut
+Round 3:
+    Current Objective value is 6.0;
+    lambda_upper is 19.0;
+    lambda_lower is 17.0;
+    Relative gap is 11.765%.
+    Absolute gap is 2.0
+Benders decomposition Round - 4
+create optimality cut
+Round 4:
+    Current Objective value is 5.0;
+    lambda_upper is 17.0;
+    lambda_lower is 17.0;
+    Relative gap is 0.0%.
+    Absolute gap is 0.0
+optimal found, it takes 4  Rounds.</code></pre></div>
+        <div class="outputs">
+          <div><code>data_output/</code><span>每一轮的目标值、λ 上下界、求解器元数据和 MAP 解。</span></div>
+          <div><code>LP_output/</code><span>开启 <code>debug_mode</code> 时导出的 MAP 和子问题的 Gurobi LP 文件。</span></div>
+          <div><code>LP_output_dwave/</code><span>量子和量子启发式求解器的输出文件。</span></div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section class="section section--alt" id="results">
+  <div class="wrap">
+    <p class="kicker">08 · 结果</p>
+    <h2>几轮之内，上下界即可收敛</h2>
+    <p class="intro">两张图都跟踪了每次迭代中连接变量 λ 的上下界和目标值。</p>
+
+    <div class="grid-2 gap-lg">
+      <figure class="figure">
+        <img src="../assets/img/result-example.png" width="652" height="460" loading="lazy" alt="示例问题：三次迭代中 λ 下界从 -62 升到 -17，上界从 0 降到 -17，目标值收敛到 -2 附近。">
+        <figcaption><strong>示例问题。</strong>即上文快速上手中的模型，λ 的上下界在三次迭代后相遇。</figcaption>
+      </figure>
+      <figure class="figure">
+        <img src="../assets/img/result-unit-commitment.png" width="690" height="432" loading="lazy" alt="机组组合问题：第一次迭代后 λ 上下界和目标值从约 -65,000 跃升到约 20,000，并在五次迭代内收敛。">
+        <figcaption><strong>机组组合。</strong>经典的电力系统 MILP，目标值和上下界都快速收敛。</figcaption>
+      </figure>
+    </div>
+
+    <div class="grid-2 gap-lg">
+      <div class="panel">
+        <h3>示例问题数据</h3>
+        <div class="math-block math-block--scroll" data-tex="\mathbf{A}_2=\begin{bmatrix}0&0\\0&0\\0&0\\0&0\\-1&-1\\-1&0\\-1&0\\0&-1\\0&-1\end{bmatrix},\ \mathbf{G}_2=\begin{bmatrix}1&0&1&0\\1&0&0&1\\0&1&1&0\\0&1&0&1\\0&0&0&0\\1&0&0&0\\0&1&0&0\\0&0&1&0\\0&0&0&1\end{bmatrix},\ \mathbf{b}_2=\begin{bmatrix}1\\1\\1\\1\\-1\\0\\0\\0\\0\end{bmatrix}"></div>
+        <div class="math-block" data-tex="\mathbf{d}^{\intercal}=\begin{bmatrix}8&9&5&6\end{bmatrix},\quad \mathbf{c}^{\intercal}=\begin{bmatrix}-15&-10\end{bmatrix}."></div>
+      </div>
+      <div class="panel panel--accent">
+        <h3>总结</h3>
+        <p>HQC-Bend 是一个基于 HQC-Bend 算法、用于求解复杂 (M)ILP 问题的 Python 包。它把适合量子计算的优化任务交给量子计算，其余部分交给经典求解器，为 (M)ILP 问题提供高效、稳健的求解方案。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DATA CENTER ============ -->
+<section class="section" id="datacenter">
+  <div class="wrap">
+    <p class="kicker">09 · 应用</p>
+    <h2>数据中心能源管理</h2>
+    <p class="intro">配套仓库 <a href="https://github.com/djzts/HQCMBD">djzts/HQCMBD</a> 中有一个为 HQC-Bend 构建的数据中心模型。它与 HQC-Bend 天然契合：启停决策是二进制变量，交给量子主问题；功率和温度是连续变量，交给 CPU 子问题。</p>
+
+    <ul class="dcstats">
+      <li><span>9</span>个服务器区域（3 × 3 网格）</li>
+      <li><span>150 kWh</span>电池，充/放电功率上限 60 / 90 kW</li>
+      <li><span>15–24 °C</span>区域允许温度</li>
+      <li><span>2.5 kW/m²</span>IT 与服务器负载密度</li>
+    </ul>
+
+    <div class="grid-2 gap-lg">
+      <div>
+        <h3>决策变量</h3>
+        <ul class="vars">
+          <li><span class="chip chip--qpu">二进制</span> 电池充/放电状态 <span class="m">u^{\text{chr}}_t, u^{\text{dis}}_t</span></li>
+          <li><span class="chip chip--qpu">二进制</span> 冷水机组和冷却塔启停 <span class="m">x^{\text{chiller}}_{j,t}, x^{\text{tower}}_{j,t}</span></li>
+          <li><span class="chip chip--cpu">连续</span> 电池功率 <span class="m">p^{\text{chr}}_t, p^{\text{dis}}_t</span></li>
+          <li><span class="chip chip--cpu">连续</span> 区域温度和送风温度 <span class="m">T^{\text{Zone}}_{i,t}, T^{\text{sup}}_{i,t}</span></li>
+          <li><span class="chip chip--cpu">连续</span> 通风风量 <span class="m">v^{\text{vent}}_t</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>优化目标</h3>
+        <p>最小化从电网购电的成本：</p>
+        <div class="math-block" data-tex="\min \sum_{t=0}^{T} p^{e,g}_{t}\, e^{\text{dc,in}}_{t}, \qquad e^{\text{dc,in}}_{t} = E^{\text{HVAC}}_t + E^{\text{Se}}_{t} + \Delta E^{\text{B}}_{t} - E^{\text{Solar}}_{t}"></div>
+        <p>电网购电量等于 HVAC 负载加服务器负载加电池充电量，再减去光伏发电量。调度方案必须满足电池约束、考虑相邻区域换热的区域热动态、通风要求，以及冷水机组和冷却塔的容量约束。</p>
+        <p><a class="arrowlink" href="https://github.com/djzts/HQCMBD/blob/main/Data_Center_class.ipynb">打开模型 Notebook</a> <a class="arrowlink" href="https://github.com/djzts/HQCMBD/blob/main/Readme.md">查看全部参数</a></p>
+      </div>
+    </div>
+
+    <details class="details">
+      <summary>完整 MILP 模型</summary>
+      <div class="math-block math-block--scroll" id="dcFormulation" data-tex="\begin{array}{lll}
+&amp;\displaystyle \min_{\substack{u^{\text{dis}}_{t},\ u^{\text{chr}}_{t},\ p^{\text{dis}}_{t},\ p^{\text{chr}}_{t},\ x^{\text{chiller}}_{j,t},\ x^{\text{tower}}_{j,t} \\ T_{i,t}^{\text{Zone}},\ T_{i,t+1}^{\text{Zone}},\ T_{i,t}^{\text{sup}},\ v^{\text{vent}}_{t}}} \sum_{t=0}^{T}p^{e,g}_{t} e^{\text{dc,in}}_{t} &amp; \\
+\text{s.t.}\quad &amp;e^{\text{dc,in}}_{t} = E^{\text{HVAC}}_t + E^{\text{Se}}_{t} +\Delta E^{\text{B}}_{t} - E^{\text{Solar}}_{t} &amp; \forall t \in \mathbf{T}\\
+&amp;e^{\text{dc,in}}_{t} \geq 0 &amp; \forall t \in \mathbf{T}\\
+&amp; \Delta E^{\text{B}}_{t} = p^{\text{chr}}_{t}\eta^{\text{chr}} - p^{\text{dis}}_{t} \cdot (\eta^{\text{dis}})^{-1} &amp; \forall t \in \mathbf{T}\\
+&amp; E^{\text{B,state}}_{t+1} = E^{\text{B,state}}_{t} + \Delta E^{\text{B}}_{t} &amp; \forall t \in \mathbf{T} \\
+&amp; \underline{\xi^{\text{B}}} \leq E^{\text{B,state}}_{t} \leq \overline{\xi^{\text{B}}} &amp; \forall t \in \mathbf{T} \\
+&amp; p^{\text{chr}}_{t} \leq \overline{p^{\text{chr}}_{t}} \cdot u^{\text{chr}}_{t} &amp; \forall t \in \mathbf{T}\\
+&amp; p^{\text{dis}}_{t} \leq \overline{p^{\text{dis}}_{t}} \cdot u^{\text{dis}}_{t} &amp; \forall t \in \mathbf{T}\\
+&amp; u^{\text{chr}}_{t} + u^{\text{dis}}_{t} \leq 1 &amp; \forall t \in \mathbf{T}\\
+&amp;T^{\text{Zone}}_{i,t+1} = T^{\text{Zone}}_{i,t} + \displaystyle\sum_{i^{\prime} \in \mathcal{N}(i)} \left(\frac{T_{i^{\prime},t}^{\text{Zone}} - T_{i,t}^{\text{Zone}}}{C^{\text{heat}}_{i}R^{\text{Zone}}_{i^{\prime}i}}\right) + \frac{\dot{m}_{i} c_{a}\left(T_{i,t}^{\text{sup}} - T_{i,t}^{\text{Zone}}\right) + \theta_{i,t}}{C^{\text{heat}}_{i}} &amp; \forall i \in \mathbf{I}^{\text{Zone}}, t \in \mathbf{T}\\
+&amp;T_{i,t}^{-} \leq T^{\text{Zone}}_{i,t} \leq T_{i,t}^{+} &amp; \forall i \in \mathbf{I}^{\text{Zone}}, t \in \mathbf{T} \\
+&amp;v^{\text{vent}}_t + v^{\text{out}}_t \geq \underline{v}^{\text{vent}}_t &amp; \forall t \in \mathbf{T}\\
+&amp;\displaystyle \sum_{j \in \mathbf{J}^{\text{chiller}}} x^{\text{chiller}}_{j,t}m^{\text{chiller}}_{j,t} \geq \frac{\left(T^{\text{out}}_{t}-\displaystyle \sum_{i \in \mathbf{I}^{\text{Zone}}}\chi_{i}T^{\text{sup}}_{i,t}\right) v^{\text{out}}_{t} c^{\text{air}}_p + \displaystyle \sum_{i \in \mathbf{I}^{\text{Zone}}}\chi_{i}\left(T^{\text{Zone}}_{i,t}-T^{\text{sup}}_{t}\right) \left(v^{\text{sup}} - v^{\text{out}}_t\right) c^{\text{air}}_p}{\left(T^{\text{chwr}}_{t}-T^{\text{chws}}_{t}\right) c^{\text{water}}_p} &amp; \forall t \in \mathbf{T}\\
+&amp;\displaystyle \sum_{j \in \mathbf{J}^{\text{tower}}} x^{\text{tower}}_{j,t}m^{\text{tower}}_{j,t} \geq \frac{\left(T^{\text{out}}_{t}-\displaystyle \sum_{i \in \mathbf{I}^{\text{Zone}}}\chi_{i}T^{\text{sup}}_{i,t}\right) v^{\text{out}}_{t} c^{\text{air}}_p + \displaystyle \sum_{i \in \mathbf{I}^{\text{Zone}}}\chi_{i}\left(T^{\text{Zone}}_{i,t}-T^{\text{sup}}_{t}\right) \left(v^{\text{sup}} - v^{\text{out}}_t\right) c^{\text{air}}_p}{\left(T^{\text{conwr}}_{t}-T^{\text{conws}}_{t}\right) c^{\text{water}}_p} &amp; \forall t \in \mathbf{T}\\
+&amp;e^{\text{vent}}_{t}=\beta^{\text{vent}}_{0}+\beta^{\text{vent}}_{1}\left(v^{\text{vent}}_t-\underline{v}^{\text{vent}}\right) &amp; \forall t \in \mathbf{T}\\
+&amp;e^{\text{chiller}}_{t}=\displaystyle\sum_{j \in \mathbf{J}^{\text{chiller}}}x^{\text{chiller}}_{j,t}\left(\beta^{\text{chiller}}_{0,j} + \beta^{\text{chiller}}_{1,j}m^{\text{chiller}}_{j,t}\right) &amp; \forall t \in \mathbf{T}\\
+&amp;e^{\text{pump}}_{t}=\beta^{\text{pump}}_{0}+\beta^{\text{pump}}_{1} \dfrac{\left(T^{\text{out}}_{t}-T^{\text{sup}}_{t}\right) v^{\text{out}}_{t} c^{\text{air}}_p + \displaystyle \sum_{i \in \mathbf{I}^{\text{Zone}}}\chi_{i}\left(T^{\text{Zone}}_{i,t}-T^{\text{sup}}_{t}\right) \left(v^{\text{sup}} - v^{\text{out}}_t\right) c^{\text{air}}_p}{\left(T^{\text{chwr}}_{t}-T^{\text{chws}}_{t}\right) c^{\text{water}}_p} &amp; \forall t \in \mathbf{T}\\
+&amp;e^{\text{tower}}_{t} = \displaystyle\sum_{j \in \mathbf{J}^{\text{tower}}}x^{\text{tower}}_{j,t} \left(\beta^{\text{tower}}_{0,j} + \beta^{\text{tower}}_{1,j}m^{\text{tower}}_{j,t}\right) &amp; \forall t \in \mathbf{T}\\
+&amp;E^{\text{HVAC}}_{t} = e^{\text{sup}}_{t} + e^{\text{vent}}_{t}+ e^{\text{chiller}}_{t} + e^{\text{pump}}_{t} + e^{\text{tower}}_{t} &amp; \forall t \in \mathbf{T}
+\end{array}"></div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ RESEARCH ============ -->
+<section class="section section--alt" id="research">
+  <div class="wrap">
+    <p class="kicker">10 · 相关研究</p>
+    <h2>基于该方法的已发表成果</h2>
+    <p class="intro">同样的思路（二进制主问题在量子硬件上求解，连续子问题由经典求解器处理）已应用于卫星与空间网络、联邦学习和能源系统等方向的同行评审论文。</p>
+    <ul class="papercount" aria-label="统计">
+      <li><span>6</span>篇同行评审论文</li>
+      <li><span>5</span>篇 IEEE 期刊论文</li>
+      <li><span>2023–2025</span>发表年份</li>
+    </ul>
+    <ol class="papers">
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--energy">能源系统</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10841900/">Quantum assisted combinatorial Benders' algorithm for the synergy of hydrogen and power distribution systems with mobile storage</a></h3>
+        <p class="paper__authors">Mingze Li, Siyuan Wang, Lei Fan, Zhu Han</p>
+        <p class="paper__venue"><em>IEEE Transactions on Power Systems</em>, vol. 40, no. 5, pp. 3967–3978, 2025</p>
+        <p class="paper__what">协同调度氢能系统与配电系统，包括车载移动储氢设施的行驶路线和装卸量。主问题以 QUBO 形式在量子退火器上求解，子问题在经典 CPU 上求解。</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">卫星网络</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10804104/">Quantum-Assisted Online Task Offloading and Resource Allocation in MEC-Enabled Satellite-Aerial-Terrestrial Integrated Networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Mobile Computing</em>, 2024</p>
+        <p class="paper__what">在低轨卫星、高空平台和地面基站共同服务物联网设备的场景下，最小化服务时延。基于 Lyapunov 的在线控制算法把随机优化问题分解为逐时隙问题，再借助量子计算求解。</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">空间网络</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10691643/">Quantum-assisted joint virtual network function deployment and maximum flow routing for space information networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Mobile Computing</em>, vol. 24, no. 2, pp. 830–844, 2025（2024 年在线发表）</p>
+        <p class="paper__what">联合优化用户关联、虚拟网络功能部署和流量路由。得到的 MILP 用混合量子-经典 Benders 分解求解，其中主问题被转换为 QUBO。</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--fl">联邦学习</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10636852/">Hybrid quantum–classical benders' decomposition for federated learning scheduling in distributed networks</a></h3>
+        <p class="paper__authors">Xinliang Wei, Lei Fan, Yuanxiong Guo, Yanmin Gong, Zhu Han, Yu Wang</p>
+        <p class="paper__venue"><em>IEEE Transactions on Network Science and Engineering</em>, vol. 11, no. 6, pp. 6038–6051, 2024</p>
+        <p class="paper__what">同时调度多个联邦学习模型，选择参与方并确定学习率。该联合问题是 NP-hard 的 MINLP，用混合量子-经典 Benders 分解求解。</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--net">卫星网络</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10614917/">Quantum-assisted joint caching and power allocation for integrated satellite-terrestrial networks</a></h3>
+        <p class="paper__authors">Yu Zhang, Yanmin Gong, Lei Fan, Yu Wang, Zhu Han, Yuanxiong Guo</p>
+        <p class="paper__venue"><em>IEEE Transactions on Network Science and Engineering</em>, vol. 11, no. 6, pp. 5163–5174, 2024</p>
+        <p class="paper__what">联合优化内容分发、缓存放置和发射功率，以最大化网络吞吐量。大规模 MINLP 用混合量子-经典<strong>广义</strong> Benders 分解求解。</p>
+      </li>
+      <li class="paper">
+        <div class="paper__meta"><span class="topic topic--fl">联邦学习</span></div>
+        <h3><a href="https://ieeexplore.ieee.org/abstract/document/10230094/">Quantum assisted scheduling algorithm for federated learning in distributed networks</a></h3>
+        <p class="paper__authors">Xinliang Wei, Lei Fan, Yuanxiong Guo, Yanmin Gong, Zhu Han, Yu Wang</p>
+        <p class="paper__venue"><em>32nd International Conference on Computer Communications and Networks (ICCCN)</em>, IEEE, pp. 1–10, 2023</p>
+        <p class="paper__what">该方法的首个应用：多模型联邦学习调度，把问题分解为二进制主问题和小规模连续子问题，结合量子计算与经典计算求解。</p>
+      </li>
+    </ol>
+    <p class="small muted papers__note">你的研究用到了 HQC-Bend？欢迎<a href="#contact">联系我们</a>，我们会把你的论文加到这里。</p>
+  </div>
+</section>
+
+<!-- ============ CITE ============ -->
+<section class="section" id="cite">
+  <div class="wrap">
+    <p class="kicker">11 · 引用</p>
+    <h2>引用 HQC-Bend</h2>
+    <p class="intro">如果你在工作中使用了 HQC-Bend，请引用 <a href="https://ieeexplore.ieee.org/abstract/document/11000177/">QCNC 2025 论文</a>：</p>
+    <div class="codecard"><button class="copy" type="button" aria-label="复制 BibTeX">复制</button>
+<pre><code class="nohighlight">@inproceedings{zhao2025hqc,
+  title={HQC-Bend: A Python Package of Hybrid Quantum-Classical Multi-cuts Benders' Decomposition Algorithm},
+  author={Zhao, Zhongqi and Li, Mingze and Fan, Lei and Han, Zhu},
+  booktitle={2025 International Conference on Quantum Communications, Networking, and Computing (QCNC)},
+  pages={591--597},
+  year={2025},
+  organization={IEEE},
+  url={https://github.com/djzts/HQCMCBD-API}
+}</code></pre></div>
+
+    <div class="contact" id="contact">
+      <div>
+        <h3>联系方式</h3>
+        <p>Zhongqi Zhao · <a href="mailto:zzhao27@uh.edu">zzhao27@uh.edu</a><br>Mingze Li · <a href="mailto:mli44@central.uh.edu">mli44@central.uh.edu</a></p>
+      </div>
+      <div>
+        <h3>链接</h3>
+        <p><a href="https://github.com/djzts/HQCMCBD-API">包源代码（HQCMCBD-API）</a><br><a href="https://github.com/djzts/HQCMBD">数据中心模型（HQCMBD）</a><br><a href="https://www.youtube.com/watch?v=VcDaOj8W4MI">视频教程</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <p>HQC-Bend · Zhongqi Zhao, Mingze Li, Lei Fan, Zhu Han · 休斯顿大学</p>
+    <p class="muted">本软件包以 MIT 许可证发布。</p>
+  </div>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script defer src="../assets/js/main.js"></script>
+</body>
+</html>

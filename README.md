@@ -9,7 +9,7 @@ Hybrid Quantum-Classical Multi-cuts Benders' Decomposition for mixed-integer lin
 
 HQCMCBD is a Python implementation of the Hybrid Quantum-Classical Multi-cuts Benders' Decomposition algorithm. It solves mixed-integer linear programming (MILP) problems by decomposing them into a binary master problem and continuous subproblems. The master problem can be solved classically with Gurobi or encoded for quantum and quantum-inspired solvers such as D-Wave CQM/BQM, OpenJij, and simulated bifurcation.
 
-**Project page: <https://djzts.github.io/HQCMCBD-API/>**. It explains the algorithm (master problem, solver backends, normal and L-shaped cuts, multi-cuts), walks through a quick start, shows results, and includes an interactive `config.json` builder.
+**Project page: <https://djzts.github.io/HQCMCBD-API/>** ([中文版](https://djzts.github.io/HQCMCBD-API/zh/)). It explains the algorithm (master problem, solver backends, normal and L-shaped cuts, multi-cuts), walks through a quick start, shows results, and includes an interactive `config.json` builder.
 
 Tutorial: [HQCMCBD overview video](https://www.youtube.com/watch?v=VcDaOj8W4MI)
 
