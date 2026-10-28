@@ -940,9 +940,24 @@ class HQCMCBD_algorithm:
         self.Normal_sub_dual.addMConstr(G_transpose, u_dual_sub, "<=", self.obj_d, name=f'Subproblem_constraints')
                     
         self.Normal_sub_dual.optimize()
+        if self.Normal_sub_dual.Status == GRB.INF_OR_UNBD:
+            # Presolve could not tell infeasible from unbounded; solve again for a definite status.
+            self.Normal_sub_dual.setParam("DualReductions", 0)
+            self.Normal_sub_dual.optimize()
         if self.flag_print:
             normal_sub_dual_path = os.path.join(self.LP_folder, f"normal_sub_dual_model-round-{counter}-cut-{index}.lp")
             self.Normal_sub_dual.write(normal_sub_dual_path)
+
+        status = self.Normal_sub_dual.Status
+        if status == GRB.UNBOUNDED:
+            # x* makes the subproblem infeasible. The values of the unbounded dual are not a ray,
+            # so take the ray w from the L-shaped feasibility check; the cut is w * A x >= w * b.
+            self.subproblem_dual_Lshape(counter, index)
+            self.lambda_upper = 1e30
+            return
+        if status != GRB.OPTIMAL:
+            raise RuntimeError(f"Normal dual subproblem ended with status {status}; "
+                               "the subproblem is unbounded or could not be solved")
 
         u_sol = self.Normal_sub_dual.getVars()
         result_ray = np.array([item.X for item in u_sol])
