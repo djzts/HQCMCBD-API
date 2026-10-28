@@ -274,6 +274,9 @@ class HQCMCBD_algorithm:
                 raise ValueError("dwave.mode is invalid")
             self.dwave_token = _resolve_dwave_token(dwave_config.get("DWave_token"))
             self.MC_flag = dwave_config.get("Mcut_flag")
+            # These backends keep only the best sample per round and never set final_mcut_num.
+            if self.MC_flag and self.dwave_solver in {"bqm_hybrid", "openjij"}:
+                raise ValueError(f"dwave.Mcut_flag is not supported with dwave.mode '{self.dwave_solver}'; set it to false")
             self.num_of_read = dwave_config.get("num_of_read")
             if not isinstance(self.num_of_read, int) or self.num_of_read <= 0:
                 raise ValueError("dwave.num_of_read must be a positive integer")

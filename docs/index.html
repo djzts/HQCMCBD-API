@@ -522,7 +522,7 @@ solver.run()</code></pre>
             <tr><td><code>Hybrid_mode</code></td><td>Solve the master problem with a quantum or quantum-inspired backend (Q+C) instead of Gurobi (C+C)</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.mode</code></td><td>How the MAP is encoded for the quantum solver</td><td><code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>, <code>openjij</code>, <code>bifurcation</code></td></tr>
             <tr><td><code>dwave.DWave_token</code></td><td>D-Wave Leap API token. Placeholder values fall back to the <code>DWAVE_API_TOKEN</code> environment variable</td><td>string</td></tr>
-            <tr><td><code>dwave.Mcut_flag</code></td><td>Add multiple cuts per iteration (otherwise one)</td><td><code>true</code>, <code>false</code></td></tr>
+            <tr><td><code>dwave.Mcut_flag</code></td><td>Add multiple cuts per iteration (otherwise one). Not supported with <code>bqm_hybrid</code> or <code>openjij</code></td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.Cutnums</code></td><td>Number of cuts per iteration when <code>Mcut_flag</code> is true</td><td>positive integer</td></tr>
             <tr><td><code>dwave.num_of_read</code></td><td>Number of samples to read from the quantum solver</td><td>positive integer</td></tr>
             <tr><td><code>threshold.type</code></td><td>Which gap the stopping rule checks: absolute <span class="m">|\bar\lambda - \underline\lambda|</span> or relative <span class="m">100\cdot|\bar\lambda - \underline\lambda| / |\bar\lambda|</span> (in percent)</td><td><code>absolute</code>, <code>relative</code></td></tr>

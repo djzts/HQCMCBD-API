@@ -169,6 +169,8 @@
   };
   var PLACEHOLDER_TOKENS = ["", "example-token", "YOUR_DWAVE_TOKEN"];
   var LOCAL_MODES = ["openjij", "bifurcation"];
+  // HQCMCBD.py rejects Mcut_flag for these modes.
+  var NO_MCUT_MODES = ["bqm_hybrid", "openjij"];
 
   var out = document.getElementById("cfgJson");
   var info = document.getElementById("lambdaInfo");
@@ -235,6 +237,9 @@
   }
 
   function update() {
+    var noMcut = NO_MCUT_MODES.indexOf(el.dmode.value) !== -1;
+    if (noMcut) el.mcut.checked = false;
+    el.mcut.disabled = noMcut;
     var cfg = read();
     out.textContent = JSON.stringify(cfg, null, 4);
     highlight(out);

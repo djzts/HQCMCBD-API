@@ -516,7 +516,7 @@ solver.run()</code></pre>
             <tr><td><code>Hybrid_mode</code></td><td>用量子或量子启发式后端求解主问题（Q+C），而不是用 Gurobi（C+C）</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.mode</code></td><td>MAP 交给量子求解器时的编码方式</td><td><code>cqm</code>, <code>bqm_hybrid</code>, <code>bqm_quantum</code>, <code>openjij</code>, <code>bifurcation</code></td></tr>
             <tr><td><code>dwave.DWave_token</code></td><td>D-Wave Leap API 令牌。若为占位值，则改为读取环境变量 <code>DWAVE_API_TOKEN</code></td><td>字符串</td></tr>
-            <tr><td><code>dwave.Mcut_flag</code></td><td>每次迭代添加多个割（否则只加一个）</td><td><code>true</code>, <code>false</code></td></tr>
+            <tr><td><code>dwave.Mcut_flag</code></td><td>每次迭代添加多个割（否则只加一个）。<code>bqm_hybrid</code> 和 <code>openjij</code> 不支持</td><td><code>true</code>, <code>false</code></td></tr>
             <tr><td><code>dwave.Cutnums</code></td><td><code>Mcut_flag</code> 为 true 时每次迭代添加的割数</td><td>正整数</td></tr>
             <tr><td><code>dwave.num_of_read</code></td><td>从量子求解器读取的样本数</td><td>正整数</td></tr>
             <tr><td><code>threshold.type</code></td><td>停止准则检查的间隙：绝对间隙 <span class="m">|\bar\lambda - \underline\lambda|</span> 或相对间隙 <span class="m">100\cdot|\bar\lambda - \underline\lambda| / |\bar\lambda|</span>（百分比）</td><td><code>absolute</code>, <code>relative</code></td></tr>

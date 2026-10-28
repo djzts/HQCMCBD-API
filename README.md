@@ -149,7 +149,7 @@ Before running the solver, review the selected configuration file.
 | `Hybrid_mode` | Whether to solve the master problem with a quantum or quantum-inspired backend. | `true`, `false` |
 | `dwave.mode` | Master-problem backend when `Hybrid_mode` is enabled. | `cqm`, `bqm_hybrid`, `bqm_quantum`, `bifurcation`, `openjij` |
 | `dwave.DWave_token` | D-Wave API token. | Token string or `YOUR_DWAVE_TOKEN` |
-| `dwave.Mcut_flag` | Whether to add multiple cuts per iteration. | `true`, `false` |
+| `dwave.Mcut_flag` | Whether to add multiple cuts per iteration. Not supported with `bqm_hybrid` or `openjij`. | `true`, `false` |
 | `dwave.Cutnums` | Number of cuts when multi-cut mode is enabled. | Positive integer |
 | `dwave.num_of_read` | Number of samples for BQM/OpenJij modes. | Positive integer |
 | `threshold.type` | Stopping criterion type. | `absolute`, `relative` |
